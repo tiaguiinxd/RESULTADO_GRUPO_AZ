@@ -1,0 +1,3404 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aztech · Acompanhamento de Margens</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a1628;
+    --bg-2:#0f1f38;
+    --card:#142943;
+    --card-2:#1a3458;
+    --border:#1e3a5f;
+    --border-hi:#2d5187;
+    --text:#e6edf5;
+    --muted:#8b9aaf;
+    --cyan:#00d4ff;
+    --purple:#b794f4;
+    --green:#4ade80;
+    --orange:#fb923c;
+    --red:#ef4444;
+    --yellow:#fde047;
+    --aztech:#00d4ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Inter,system-ui,sans-serif;font-size:14px;line-height:1.4}
+  a{color:var(--cyan)}
+  .wrap{max-width:1600px;margin:0 auto;padding:24px}
+
+  /* ---------- HEADER ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#00d4ff 0%,#7c3aed 100%);display:grid;place-items:center;font-weight:800;font-size:18px;color:#0a1628;letter-spacing:.5px}
+  .brand h1{margin:0;font-size:20px;font-weight:600;letter-spacing:.3px}
+  .brand .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .uploads{display:flex;gap:10px;flex-wrap:wrap}
+  .upload{position:relative;display:flex;flex-direction:column;gap:4px;padding:10px 14px;background:var(--card);border:1px dashed var(--border-hi);border-radius:10px;cursor:pointer;min-width:200px;transition:all .15s}
+  .upload:hover{border-color:var(--cyan);background:var(--card-2)}
+  .upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .upload .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .upload .fname{font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}
+  .upload .fname.empty{color:var(--muted);font-style:italic;font-weight:400}
+  .upload.ok{border-style:solid;border-color:var(--green)}
+  .upload.ok .lbl{color:var(--green)}
+
+  /* ---------- EMPTY STATE ---------- */
+  .empty-state{padding:60px 24px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:14px;margin-top:16px}
+  .empty-state h2{margin:0 0 8px;font-weight:500;color:var(--text)}
+  .empty-state p{margin:6px 0;color:var(--muted)}
+  .empty-state .steps{display:inline-flex;flex-direction:column;gap:8px;text-align:left;margin-top:16px;padding:18px 22px;background:var(--bg-2);border-radius:10px;border:1px solid var(--border)}
+  .empty-state .steps li{color:var(--muted)}
+  .empty-state .steps li b{color:var(--cyan)}
+
+  /* ---------- SISTEMA DE COLAPSO POR BLOCO ---------- */
+  .collapsible{position:relative}
+  .collapse-btn{position:absolute;top:10px;right:12px;z-index:20;background:rgba(20,41,67,0.7);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none;transition:all .15s;backdrop-filter:blur(4px);font-family:inherit}
+  .collapse-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,0.12)}
+  .collapse-btn .chev{font-size:9px;display:inline-block;transition:transform .2s}
+  .collapsed-placeholder{display:none;background:var(--bg-2);border:1px dashed var(--border-hi);border-radius:10px;padding:12px 18px;color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;align-items:center;justify-content:space-between;gap:10px}
+  .collapsed-placeholder:hover{background:var(--card);border-color:var(--cyan);color:var(--cyan)}
+  .collapsed-placeholder .pl-title{display:flex;align-items:center;gap:8px}
+  .collapsed-placeholder .pl-expand{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--cyan);font-weight:700}
+  /* Quando o bloco está colapsado, esconde tudo dentro exceto o placeholder e o botão. Mostra o placeholder. */
+  .collapsible.collapsed > *:not(.collapsed-placeholder):not(.collapse-btn){display:none !important}
+  .collapsible.collapsed > .collapsed-placeholder{display:flex !important}
+  .collapsible.collapsed{margin-bottom:14px}
+  /* Botão "Expandir tudo" — só aparece quando há alguma seção colapsada */
+  .expand-all-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:var(--orange);color:#0a1628;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;font-family:inherit;transition:filter .15s}
+  .expand-all-btn:hover{filter:brightness(1.1)}
+  .expand-all-btn.hidden{display:none}
+
+  /* ---------- PONTOS DE ATENÇÃO (alertas) ---------- */
+  .alertas-section{margin-bottom:18px}
+  .alertas-card{background:linear-gradient(135deg,#1a1730 0%,#2a1a1f 100%);border:1px solid #4a2530;border-radius:12px;padding:14px 18px;position:relative;overflow:hidden}
+  .alertas-card.empty{background:linear-gradient(135deg,#0f1f38 0%,#142943 100%);border-color:#1e4030}
+  .alertas-card.empty::before{background:var(--green)}
+  .alertas-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--red)}
+  .alertas-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .alertas-title{font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center;gap:8px}
+  .alertas-card.empty .alertas-title{color:var(--green)}
+  .alertas-title .ico{font-size:18px}
+  .alertas-count{font-size:11px;color:var(--muted);font-weight:500}
+  .alertas-count b{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+  .alertas-list{display:flex;flex-direction:column;gap:6px}
+  .alerta-item{display:grid;grid-template-columns:32px 60px 1fr auto auto;gap:12px;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s}
+  .alerta-item:hover{border-color:var(--red);transform:translateX(2px);background:rgba(239,68,68,0.08)}
+  .alerta-item .a-icon{font-size:18px;text-align:center}
+  .alerta-item .a-cod{font-weight:800;color:var(--cyan);font-size:14px;font-variant-numeric:tabular-nums}
+  .alerta-item .a-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .alerta-item .a-name{color:var(--text);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .alerta-item .a-sub{color:var(--muted);font-size:10px}
+  .alerta-item .a-sub b{color:var(--text);font-weight:600}
+  .alerta-item .a-metric{text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;min-width:80px}
+  .alerta-item .a-action{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:4px 10px;border-radius:14px;white-space:nowrap}
+  .alerta-item .a-action.urgente{background:var(--red);color:#fff}
+  .alerta-item .a-action.alta{background:var(--orange);color:#0a1628}
+  .alerta-item .a-action.media{background:var(--yellow);color:#0a1628}
+  .alertas-card.empty .alertas-empty-msg{color:var(--green);text-align:center;padding:8px 0;font-size:13px;font-weight:500}
+
+  /* ---------- NOVIDADES DA SEMANA ---------- */
+  .novidades-section{margin-bottom:18px}
+  .novidades-card{background:linear-gradient(135deg,#0f2540 0%,#143855 100%);border:1px solid #2e6378;border-radius:12px;padding:14px 18px;position:relative;overflow:hidden}
+  .novidades-card.empty{background:linear-gradient(135deg,#0f1f38 0%,#142943 100%);border-color:var(--border)}
+  .novidades-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cyan)}
+  .novidades-card.empty::before{background:var(--muted);opacity:.4}
+  .novidades-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+  .novidades-title{font-size:13px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center;gap:8px}
+  .novidades-card.empty .novidades-title{color:var(--muted)}
+  .novidades-title .ico{font-size:18px}
+  .novidades-meta{font-size:11px;color:var(--muted);font-weight:500}
+  .novidades-meta b{color:var(--text);font-weight:700}
+  .novidades-list{display:flex;flex-direction:column;gap:6px}
+  .novidade-item{display:grid;grid-template-columns:30px 60px 1fr auto;gap:12px;align-items:center;padding:9px 12px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s}
+  .novidade-item:hover{border-color:var(--cyan);transform:translateX(2px);background:rgba(0,212,255,0.08)}
+  .novidade-item .n-icon{font-size:18px;text-align:center;color:var(--cyan)}
+  .novidade-item .n-cod{font-weight:800;color:var(--cyan);font-size:14px;font-variant-numeric:tabular-nums}
+  .novidade-item .n-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .novidade-item .n-name{color:var(--text);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .novidade-item .n-sub{color:var(--muted);font-size:10px}
+  .novidade-item .n-sub b{color:var(--text);font-weight:600}
+  .novidade-item .n-metric{text-align:right;min-width:130px}
+  .novidade-item .n-prop{font-size:14px;font-weight:700;color:var(--cyan);font-variant-numeric:tabular-nums}
+  .novidade-item .n-margem{font-size:10px;color:var(--muted);margin-top:2px}
+  .novidades-removidas{margin-top:10px;padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:11px;color:var(--muted);font-style:italic}
+  .novidades-removidas b{color:var(--text);font-style:normal;font-weight:700}
+  .novidades-empty-msg{color:var(--muted);padding:6px 0;font-size:12px;font-style:italic;text-align:center}
+
+  /* ---------- TOP ESTRELAS / TOP CRÍTICAS ---------- */
+  .top-section{margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:780px){.top-section{grid-template-columns:1fr}}
+  .top-block{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .top-block.estrelas{border-left:3px solid var(--green)}
+  .top-block.criticas{border-left:3px solid var(--red)}
+  .top-block-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .top-block.estrelas .top-block-title{color:var(--green)}
+  .top-block.criticas .top-block-title{color:var(--red)}
+  .top-row{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;font-size:13px}
+  .top-row:last-child{border-bottom:none}
+  .top-row:hover{background:var(--bg-2)}
+  .top-row .t-cod{color:var(--cyan);font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+  .top-row .t-info{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .top-row .t-name{color:var(--text);font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-row .t-sub{color:var(--muted);font-size:10px}
+  .top-row .t-margem{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+  .top-row .t-margem.good{color:var(--green)}
+  .top-row .t-margem.bad{color:var(--red)}
+  .top-row .t-margem.warn{color:var(--orange)}
+  .top-block-empty{color:var(--muted);text-align:center;font-style:italic;padding:14px 0;font-size:12px}
+
+  /* highlight temporário ao clicar num item de alerta */
+  tbody tr.flash-highlight{background:rgba(255,212,0,0.25) !important;transition:background 1s}
+
+  /* ---------- HERO KPI CARDS ---------- */
+  .hero-section{margin-bottom:20px}
+  .kpi-row-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin:14px 0 8px;display:flex;align-items:center;gap:6px}
+  .kpi-row-lbl:first-child{margin-top:0}
+  .kpi-grid{display:grid;gap:10px}
+  .kpi-grid-4{grid-template-columns:repeat(4,1fr)}
+  .kpi-grid-5{grid-template-columns:repeat(5,1fr)}
+  @media (max-width:1100px){
+    .kpi-grid-4,.kpi-grid-5{grid-template-columns:repeat(3,1fr)}
+  }
+  @media (max-width:780px){
+    .kpi-grid-4,.kpi-grid-5{grid-template-columns:repeat(2,1fr)}
+  }
+  .kpi-card{background:linear-gradient(160deg,#142943 0%,#1a3458 100%);border:1px solid var(--border-hi);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:110px;text-align:center;position:relative;transition:transform .15s, box-shadow .15s}
+  .kpi-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.3)}
+  .kpi-title{font-size:12px;color:var(--cyan);font-weight:600;letter-spacing:.3px;margin-bottom:8px;line-height:1.2}
+  .kpi-value{font-size:30px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.5px}
+  .kpi-value.muted{color:var(--muted)}
+  .kpi-sub{font-size:10px;color:var(--muted);margin-top:6px;font-weight:500}
+  .kpi-delta{font-size:10px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi-delta.up{color:var(--green)}
+  .kpi-delta.down{color:var(--red)}
+  .kpi-delta.flat{color:var(--muted)}
+  /* Cards com mini gauge de arco (estilo screenshot) */
+  .kpi-gauge-card{padding-top:10px}
+  .kpi-gauge-wrap{position:relative;width:130px;height:78px;margin:4px auto 0}
+  .kpi-gauge-svg{width:100%;height:100%;display:block}
+  .kpi-gauge-num{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+
+  /* ---------- FILTERS ---------- */
+  .filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 16px;padding:14px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+  .filters .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:6px}
+  .chip{padding:6px 14px;border-radius:20px;background:var(--bg-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;user-select:none}
+  .chip:hover{border-color:var(--border-hi);color:var(--text)}
+  .chip.on{background:var(--cyan);border-color:var(--cyan);color:#0a1628;font-weight:600}
+  .filters .sp{flex:1}
+  .filters .meta{font-size:12px;color:var(--muted)}
+  .filters .meta b{color:var(--text)}
+  .filters .divider{width:1px;height:24px;background:var(--border);margin:0 4px}
+  .filters .vis-group{display:flex;align-items:center;gap:6px}
+  .filters .vis-group .vis-chip{padding:5px 10px;border-radius:14px;background:var(--bg-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;transition:all .15s;user-select:none}
+  .filters .vis-group .vis-chip:hover{color:var(--text);border-color:var(--border-hi)}
+  .filters .vis-group .vis-chip.on{background:var(--green);border-color:var(--green);color:#0a1628}
+  .filters .vis-group .vis-chip.on.todos{background:var(--orange);border-color:var(--orange);color:#0a1628}
+  .filters .vis-group .vis-chip.on.incluir{background:var(--yellow);border-color:var(--yellow);color:#0a1628}
+
+  /* ---------- TYPE CARDS ---------- */
+  .type-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:24px}
+  .tc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+  .tc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cyan)}
+  .tc[data-tipo="PINTURA INDUSTRIAL"]::before{background:var(--purple)}
+  .tc[data-tipo="TUBULAÇÃO"]::before{background:var(--cyan)}
+  .tc[data-tipo="INFRAESTRUTURA"]::before{background:var(--orange)}
+  .tc[data-tipo="AZ-MAQ"]::before{background:var(--green)}
+  .tc[data-tipo="OUTROS SERVIÇOS"]::before{background:var(--yellow)}
+  .tc h3{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .tc .row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13px}
+  .tc .row .k{color:var(--muted)}
+  .tc .row .v{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  .tc .row .v.purple{color:var(--purple)}
+  .tc .row .v.cyan{color:var(--cyan)}
+  .tc .row .v.green{color:var(--green)}
+  .tc .row .v.orange{color:var(--orange)}
+  .tc .delta{font-size:11px;font-weight:500;margin-left:6px;font-variant-numeric:tabular-nums}
+  .tc .delta.up{color:var(--green)}
+  .tc .delta.down{color:var(--red)}
+  .tc .delta.flat{color:var(--muted)}
+  .tc .margin-big{display:flex;align-items:baseline;gap:6px;padding-top:10px;margin-top:6px;border-top:1px dashed var(--border-hi)}
+  .tc .margin-big .val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+  .tc .margin-big .delta{font-size:13px}
+
+  /* ---------- CHARTS ---------- */
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+  @media (max-width:1100px){.charts-row{grid-template-columns:1fr}}
+  .chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .chart-card h3{margin:0 0 14px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .chart-card h3 .comp-sub{text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;font-size:11px;margin-left:6px;font-style:italic}
+  .chart-card .chart-wrap{position:relative;height:260px}
+  /* composição: 2 donuts lado a lado */
+  .comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:780px){.comp-grid{grid-template-columns:1fr}}
+  .comp-side{display:flex;flex-direction:column;align-items:center}
+  .comp-label{font-size:11px;color:var(--muted);letter-spacing:.6px;font-weight:700;margin-bottom:6px;text-transform:uppercase}
+  .comp-wrap{position:relative;width:100%;height:200px}
+  .comp-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center}
+  .comp-center-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .comp-center-val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--green);line-height:1}
+  .comp-center-val.warn{color:var(--orange)}
+  .comp-center-val.bad{color:var(--red)}
+  .comp-center-delta{font-size:11px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .comp-center-delta.up{color:var(--green)}
+  .comp-center-delta.down{color:var(--red)}
+  .comp-center-delta.flat{color:var(--muted)}
+  .comp-legend{width:100%;margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .comp-legend .lg-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:2px 4px;border-radius:4px}
+  .comp-legend .lg-row .lg-left{display:flex;align-items:center;gap:8px;color:var(--text)}
+  .comp-legend .lg-row .lg-sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+  .comp-legend .lg-row .lg-val{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  .comp-legend .lg-row .lg-pct{font-size:11px;color:var(--muted);margin-left:6px}
+  /* ===== VELOCÍMETROS ===== */
+  .gauges-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;height:100%;align-items:start}
+  @media (max-width:780px){.gauges-grid{grid-template-columns:repeat(2,1fr)}}
+  .gauge{display:flex;flex-direction:column;align-items:center;padding:6px 4px}
+  .gauge-title{font-size:11px;color:var(--text);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:center;margin-bottom:2px;min-height:28px;display:flex;align-items:center}
+  .gauge-svg{width:100%;max-width:170px;height:auto;display:block}
+  .gauge-value{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;margin-top:-12px}
+  .gauge-zone{font-size:10px;font-weight:700;letter-spacing:.3px;margin-top:4px}
+  .gauge-sub{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.3;min-height:24px}
+  .gauge-empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:60px 20px;font-style:italic}
+  /* Link clicável dentro do subtítulo do gauge — vira filtro de critério */
+  .gauge-filter-link{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;font-weight:700;transition:all .15s;padding:1px 3px;border-radius:3px}
+  .gauge-filter-link:hover{background:rgba(0,212,255,0.15);text-decoration-style:solid;filter:brightness(1.2)}
+  .gauge-filter-link.active{background:var(--cyan)!important;color:#0a1628!important;text-decoration:none;padding:2px 6px;border-radius:4px}
+  /* Chip de critério ativo na barra de filtros */
+  .criterio-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 6px 5px 12px;background:linear-gradient(135deg,#2e1730 0%,#4a2030 100%);border:1px solid var(--red);color:var(--text);border-radius:16px;font-size:11px;font-weight:600;letter-spacing:.2px;box-shadow:0 0 0 3px rgba(239,68,68,0.12);animation:pulseCrit 2s ease-in-out infinite}
+  .criterio-chip.hidden{display:none}
+  .criterio-chip .crit-icon{font-size:13px}
+  .criterio-chip .crit-clear{background:rgba(239,68,68,0.25);border:none;color:var(--red);cursor:pointer;font-size:14px;font-weight:800;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
+  .criterio-chip .crit-clear:hover{background:var(--red);color:#fff;transform:rotate(90deg)}
+  @keyframes pulseCrit{0%,100%{box-shadow:0 0 0 3px rgba(239,68,68,0.12)}50%{box-shadow:0 0 0 5px rgba(239,68,68,0.20)}}
+
+  /* ---------- TABLE ---------- */
+  /* ===== Análise por Categoria (Curva ABC) ===== */
+  .cat-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .cat-select{background:var(--bg-2);color:var(--text);border:1px solid var(--border-hi);border-radius:8px;padding:6px 10px;font-size:12px;max-width:440px;cursor:pointer}
+  .cat-select:focus{outline:none;border-color:var(--cyan)}
+  .cat-cols{display:grid;grid-template-columns:26px minmax(150px,230px) 1fr 100px 52px 56px 104px;gap:8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+  .cat-cols span:nth-child(n+4){text-align:right}
+  .cat-list{display:flex;flex-direction:column;gap:5px}
+  .cat-row{display:grid;grid-template-columns:26px minmax(150px,230px) 1fr 100px 52px 56px 104px;gap:8px;align-items:center;font-size:12px}
+  .cat-rank{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+  .cat-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+  .cat-abc{flex:none;display:inline-block;width:17px;height:17px;line-height:17px;text-align:center;border-radius:4px;font-size:10px;font-weight:700}
+  .cat-abc.A{background:rgba(0,212,255,.14);color:var(--cyan);border:1px solid var(--cyan)}
+  .cat-abc.B{background:rgba(253,224,71,.10);color:var(--yellow);border:1px solid var(--yellow)}
+  .cat-abc.C{background:rgba(139,154,175,.10);color:var(--muted);border:1px solid var(--border-hi)}
+  .cat-bar-wrap{display:block;background:var(--bg-2);border-radius:5px;height:14px;overflow:hidden}
+  .cat-bar{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#0086b3,var(--cyan));min-width:2px;transition:width .4s ease}
+  .cat-row.demais .cat-bar{background:var(--border-hi)}
+  .cat-row.demais .cat-name{color:var(--muted);font-style:italic}
+  .cat-val{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+  .cat-pct{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  .cat-acum{text-align:right;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .cat-delta{text-align:right;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cat-delta.up{color:var(--red)}     /* gasto aumentou = atenção */
+  .cat-delta.down{color:var(--green)}
+  .cat-delta.flat{color:var(--muted)}
+  .cat-row[data-cat],.cat-row[data-demais]{cursor:pointer;border-radius:6px;margin:0 -6px;padding:2px 6px}
+  .cat-row[data-cat]:hover,.cat-row[data-demais]:hover{background:var(--bg-2)}
+  .cat-row.cat-sub .cat-name{padding-left:14px;color:var(--muted)}
+  .cat-delta-click{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+  .cat-delta-click:hover{filter:brightness(1.35)}
+  /* drill-down de lançamentos */
+  .cat-detail{background:var(--bg-2);border:1px solid var(--border-hi);border-radius:10px;margin:4px 0 8px 34px;padding:10px 14px;animation:catFade .18s ease}
+  @keyframes catFade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .cat-detail-head{display:flex;gap:12px;align-items:center;font-size:12px;margin-bottom:8px;color:var(--muted);flex-wrap:wrap}
+  .cat-detail-head b{color:var(--cyan)}
+  .cat-detail-close{margin-left:auto;cursor:pointer;color:var(--muted);border:1px solid var(--border-hi);border-radius:6px;padding:2px 9px;font-size:11px;white-space:nowrap}
+  .cat-detail-close:hover{color:var(--text);border-color:var(--cyan)}
+  .cat-detail .scrollbox{max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:6px}
+  .cat-detail table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .cat-detail th{position:sticky;top:0;background:var(--card);text-align:left;color:var(--muted);font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border-hi);text-transform:uppercase;font-size:9.5px;letter-spacing:.4px}
+  .cat-detail td{padding:4px 8px;border-bottom:1px solid var(--border);vertical-align:top;text-align:left}
+  .cat-detail tr:hover td{background:rgba(0,212,255,.04)}
+  .cat-detail td.cod{color:var(--cyan);font-weight:600;white-space:nowrap}
+  .cat-detail td.desc{max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+  .cat-detail td.val{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+  /* ===== Diagrama de Pareto ===== */
+  .pareto-block{margin-top:16px;border-top:1px solid var(--border);padding-top:12px}
+  .pareto-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px}
+  .pareto-title .comp-sub{text-transform:none;letter-spacing:0;font-weight:400;font-style:italic}
+  .pareto-wrap{position:relative;height:280px}
+  @media(max-width:900px){.pareto-wrap{height:230px}}
+
+  /* ===== Fluxo de Caixa ===== */
+  .fluxo-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .fluxo-chip{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:4px 12px;cursor:pointer;user-select:none;transition:.12s}
+  .fluxo-chip:hover{border-color:var(--border-hi);color:var(--text)}
+  .fluxo-chip.on{color:var(--text);border-color:var(--border-hi);background:var(--card-2)}
+  .fluxo-chip:not(.on){opacity:.55;text-decoration:line-through}
+  .fc-dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .fluxo-wrap{position:relative;height:300px;margin-top:10px}
+  .fluxo-aviso{margin-top:10px;font-size:11.5px;color:var(--yellow);background:rgba(253,224,71,.07);border:1px solid rgba(253,224,71,.35);border-radius:8px;padding:7px 12px}
+  .fluxo-scroll{overflow-x:auto;margin-top:10px}
+  .fluxo-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+  .fluxo-table th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:9.5px;letter-spacing:.4px;padding:4px 6px;border-bottom:1px solid var(--border-hi);text-align:right}
+  .fluxo-table th:first-child{text-align:left}
+  .fluxo-table td{padding:4px 6px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fluxo-table td.fl-nome{text-align:left;color:var(--muted);font-weight:600;white-space:nowrap}
+  .fluxo-table td.fl-tot{font-weight:700;border-left:1px solid var(--border-hi)}
+  .fluxo-table .fl-zero{color:var(--border-hi)}
+  .fluxo-table tr.fl-dr td{color:var(--orange)}
+  .fluxo-table tr.fl-dp td{color:rgba(251,146,60,.6)}
+  .fluxo-table tr.fl-rr td{color:var(--green)}
+  .fluxo-table tr.fl-rp td{color:rgba(74,222,128,.6)}
+  .fluxo-table tr.fl-dr td.fl-nome,.fluxo-table tr.fl-dp td.fl-nome,
+  .fluxo-table tr.fl-rr td.fl-nome,.fluxo-table tr.fl-rp td.fl-nome{color:var(--muted)}
+  .fluxo-table tr.fl-saldo td{border-top:1px solid var(--border-hi);font-weight:700}
+  .fluxo-table td.neg{color:var(--red)}
+  .fluxo-table td.pos{color:var(--cyan)}
+  .fluxo-table tr.fl-saldo td.fl-nome{color:var(--text)}
+
+  /* ===== Overlay de senha (dados criptografados no GitHub Pages) ===== */
+  #senhaOverlay{position:fixed;inset:0;background:rgba(4,10,20,.92);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+  .senha-box{background:var(--card);border:1px solid var(--border-hi);border-radius:14px;padding:34px 38px;display:flex;flex-direction:column;gap:10px;align-items:center;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .senha-logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#0086b3);color:#04101e;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center}
+  .senha-title{font-size:16px;font-weight:700;color:var(--text)}
+  .senha-sub{font-size:12px;color:var(--muted)}
+  .senha-msg{font-size:12px;color:var(--red);min-height:16px}
+  .senha-box input{background:var(--bg-2);color:var(--text);border:1px solid var(--border-hi);border-radius:8px;padding:9px 14px;font-size:14px;width:100%;text-align:center}
+  .senha-box input:focus{outline:none;border-color:var(--cyan)}
+  .senha-box button{background:linear-gradient(135deg,#00d4ff,#0086b3);color:#04101e;font-weight:700;border:none;border-radius:8px;padding:9px 22px;font-size:13px;cursor:pointer;width:100%}
+  .senha-box button:hover{filter:brightness(1.1)}
+
+  .lanc-search{background:var(--card);color:var(--text);border:1px solid var(--border-hi);border-radius:7px;padding:4px 10px;font-size:11.5px;min-width:260px;flex:1;max-width:380px}
+  .lanc-search:focus{outline:none;border-color:var(--cyan)}
+  .lanc-search::placeholder{color:var(--muted)}
+  .cat-detail th.lsort{cursor:pointer;user-select:none;white-space:nowrap}
+  .cat-detail th.lsort:hover{color:var(--cyan)}
+  .lanc-more-btn{display:block;width:100%;margin-top:6px;background:var(--card);color:var(--muted);border:1px dashed var(--border-hi);border-radius:7px;padding:5px;font-size:11px;cursor:pointer}
+  .lanc-more-btn:hover{color:var(--cyan);border-color:var(--cyan)}
+  .lanc-sum{margin-top:7px;font-size:11.5px;color:var(--muted)}
+  .lanc-sum b{color:var(--text)}
+  .lanc-more{margin-top:5px;font-size:11px;color:var(--muted);font-style:italic}
+  .lanc-none{font-size:11.5px;color:var(--muted);font-style:italic;padding:4px 0 8px}
+  .dl-group{margin-top:8px}
+  .dl-title{font-size:11.5px;font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+  .dl-title.up{color:var(--red)}
+  .dl-title.down{color:var(--green)}
+  .dl-net{font-weight:700;font-size:12px}
+  .dl-net.up{color:var(--red)}
+  .dl-net.down{color:var(--green)}
+  .dl-net.flat{color:var(--muted)}
+  .cat-total{display:grid;grid-template-columns:26px minmax(150px,230px) 1fr 100px 52px 56px 104px;gap:8px;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-size:13px;font-weight:700}
+  .cat-total .cat-val{color:var(--cyan)}
+  .cat-foot{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+  .cat-foot b{color:var(--text);font-weight:600}
+  .cat-empty{color:var(--muted);font-size:13px;padding:24px;text-align:center}
+  @media(max-width:900px){
+    .cat-cols{display:none}
+    .cat-row,.cat-total{grid-template-columns:22px 1fr 90px;}
+    .cat-row .cat-bar-wrap,.cat-row .cat-pct,.cat-row .cat-acum,.cat-row .cat-delta,
+    .cat-total .cat-bar-wrap,.cat-total .cat-pct,.cat-total .cat-acum,.cat-total .cat-delta{display:none}
+  }
+
+  .table-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:0;overflow:hidden}
+  .table-card .thead{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .table-card h2{margin:0;font-size:15px;font-weight:600;color:var(--text)}
+  .table-card .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:1100px}
+  thead th{padding:14px 12px;text-align:right;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--cyan);background:var(--bg-2);border-bottom:1px solid var(--border);position:sticky;top:0;cursor:pointer;user-select:none;transition:background .15s, color .15s}
+  thead th:hover{background:rgba(0,212,255,0.08)}
+  thead th.sort-active{background:rgba(0,212,255,0.12);color:var(--cyan) !important}
+  thead th .sub{display:block;font-size:10px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;margin-top:2px;font-style:italic}
+  thead th .sort-arrow{display:inline-block;margin-left:4px;opacity:.25;font-size:10px;vertical-align:middle;transition:opacity .15s;font-weight:700}
+  thead th:hover .sort-arrow{opacity:.6}
+  thead th.sort-active .sort-arrow{opacity:1;color:var(--cyan)}
+  thead th .sort-arrow::before{content:"⇅"}
+  thead th.sort-asc .sort-arrow::before{content:"▲"}
+  thead th.sort-desc .sort-arrow::before{content:"▼"}
+  thead th:nth-child(1),thead th:nth-child(2){text-align:left}
+  thead th:nth-child(3){color:var(--cyan)}
+  thead th:nth-child(4){color:var(--green)}
+  thead th:nth-child(7){color:var(--purple)}
+  thead th:nth-child(8){color:var(--yellow)}
+  thead th:nth-child(9){color:var(--muted)}
+  thead th:nth-child(10){color:var(--orange)}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+  tbody tr:hover{background:var(--bg-2)}
+  tbody tr.total{background:var(--bg-2);font-weight:700;border-top:2px solid var(--border-hi)}
+  tbody tr.total td{padding-top:18px;padding-bottom:18px}
+  tbody td{padding:12px;text-align:right;font-variant-numeric:tabular-nums;vertical-align:middle}
+  tbody td:nth-child(1),tbody td:nth-child(2){text-align:left}
+  tbody td .resp-cell{font-size:11px;color:var(--text);font-weight:500;line-height:1.3;max-width:140px;white-space:normal;word-break:break-word}
+  tbody td .resp-cell.empty{color:var(--muted);font-style:italic}
+  td .cn-cell{display:flex;align-items:center;gap:10px;padding-left:6px;border-left:3px solid var(--border);min-width:380px}
+  td .cn-cell.PINTURA{border-left-color:var(--purple)}
+  td .cn-cell.TUBULA{border-left-color:var(--cyan)}
+  td .cn-cell.INFRA{border-left-color:var(--orange)}
+  td .cn-cell.AZMAQ{border-left-color:var(--green)}
+  td .cn-cell.OUTROS{border-left-color:var(--yellow)}
+  td .cn-full{font-weight:500;color:var(--text);font-size:13px;line-height:1.35}
+  td .cn-full .cod-prefix{color:var(--cyan);font-weight:700;margin-right:2px}
+  td .cn-full .cn-sep{color:var(--muted);margin:0 4px;font-weight:400}
+  td .cn-full .cn-desc{color:var(--text);font-weight:600}
+  td .cn-full .cn-tail{color:var(--muted);font-weight:500}
+  .val-big{font-size:15px;font-weight:600;color:var(--cyan)}
+  .val-big.purple{color:var(--purple)}
+  .val-big.green{color:var(--green)}
+  .val-big.yellow{color:var(--yellow)}
+  .val-big.orange{color:var(--orange)}
+  .val-prev{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-bottom:2px;font-variant-numeric:tabular-nums}
+  .val-delta{display:block;font-size:11px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
+  .val-delta.up{color:var(--green)}
+  .val-delta.down{color:var(--red)}
+  .val-delta.flat{color:var(--muted)}
+  .pct{font-size:14px;font-weight:600}
+  .margin-cell{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .margin-cell.good{color:var(--green)}
+  .margin-cell.warn{color:var(--orange)}
+  .margin-cell.bad{color:var(--red)}
+  .pct-fat-cell{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;display:inline-block}
+  .pct-fat-cell.good{color:var(--green)}
+  .pct-fat-cell.warn{color:var(--yellow)}
+  .pct-fat-cell.bad{color:var(--muted)}
+  /* Botão + dropdown de visibilidade de colunas */
+  .col-toggle-wrap{position:relative;display:inline-block;margin-left:12px}
+  .col-toggle-btn{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;font-family:inherit;letter-spacing:.2px}
+  .col-toggle-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .col-toggle-btn.open{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.08)}
+  .col-toggle-btn .count{color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums;padding:1px 5px;background:rgba(255,255,255,.05);border-radius:3px;font-size:10px}
+  .col-toggle-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--card);border:1px solid var(--border-hi);border-radius:8px;padding:10px 12px;z-index:50;min-width:230px;box-shadow:0 8px 28px rgba(0,0,0,.45);display:none}
+  .col-toggle-dropdown.open{display:block}
+  .col-dd-header{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .col-dd-list{display:flex;flex-direction:column;gap:2px;max-height:340px;overflow-y:auto}
+  .col-dd-item{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text);transition:background .12s;user-select:none}
+  .col-dd-item:hover{background:var(--bg-2)}
+  .col-dd-item input{accent-color:var(--cyan);cursor:pointer;width:14px;height:14px;margin:0;flex-shrink:0}
+  .col-dd-item.locked{opacity:.55;cursor:not-allowed}
+  .col-dd-item.locked input{cursor:not-allowed}
+  .col-dd-item.locked::after{content:"obrigatória";margin-left:auto;font-size:9px;color:var(--muted);font-style:italic}
+  .col-dd-actions{margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+  .col-dd-reset{padding:6px 10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;transition:all .15s;font-family:inherit;width:100%;text-transform:uppercase;letter-spacing:.4px}
+  .col-dd-reset:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.06)}
+  .margin-delta{font-size:12px;font-weight:600;margin-left:6px}
+  .margin-delta.up{color:var(--green)}
+  .margin-delta.down{color:var(--red)}
+  .margin-delta.flat{color:var(--muted)}
+
+  /* footer */
+  footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;text-align:center}
+
+  /* ----- BOTÃO GERENCIAR + BADGE ----- */
+  .manage-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border-hi);color:var(--text);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+  .manage-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .manage-btn .badge{display:inline-block;min-width:18px;padding:2px 6px;background:var(--orange);color:#0a1628;border-radius:10px;font-size:10px;font-weight:700;line-height:1}
+  .manage-btn .badge.hidden{display:none}
+
+  /* ----- BOTÃO INLINE × PARA ESCONDER LINHA ----- */
+  td .hide-btn{background:none;border:none;color:var(--muted);cursor:pointer;opacity:.25;padding:0 4px;border-radius:3px;font-size:16px;line-height:1;transition:all .15s;font-weight:700;width:20px;flex-shrink:0}
+  tbody tr:hover td .hide-btn{opacity:.65}
+  td .hide-btn:hover{color:var(--red)!important;opacity:1!important;background:rgba(239,68,68,.15)}
+
+  /* ----- DRAWER LATERAL ----- */
+  .drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+  .drawer-bg.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:-540px;width:520px;max-width:92vw;height:100vh;background:var(--card);border-left:1px solid var(--border-hi);z-index:100;display:flex;flex-direction:column;transition:right .25s ease-out;box-shadow:-8px 0 32px rgba(0,0,0,.4)}
+  .drawer.open{right:0}
+  .drawer-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg-2)}
+  .drawer-header h2{margin:0;font-size:16px;font-weight:600;color:var(--text)}
+  .drawer-stats{font-size:11px;color:var(--muted);margin-left:auto}
+  .drawer-stats b{color:var(--cyan)}
+  .drawer-close{background:none;border:none;color:var(--muted);font-size:28px;cursor:pointer;padding:0 4px;line-height:1;margin-left:8px}
+  .drawer-close:hover{color:var(--red)}
+  .drawer-actions{padding:12px 22px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
+  .drawer-actions button{padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;transition:all .15s}
+  .drawer-actions button:hover{border-color:var(--cyan);color:var(--cyan)}
+  .drawer-actions button.reset{border-color:var(--orange);color:var(--orange)}
+  .drawer-actions button.reset:hover{background:var(--orange);color:#0a1628}
+  .drawer-search{padding:10px 22px;border-bottom:1px solid var(--border)}
+  .drawer-search input{width:100%;padding:8px 12px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;font-family:inherit}
+  .drawer-search input:focus{outline:none;border-color:var(--cyan)}
+  .drawer-body{flex:1;overflow-y:auto;padding:8px 22px 22px}
+  .drawer-group-hd{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin:12px 0 4px;padding-bottom:4px;border-bottom:1px dashed var(--border)}
+  .drawer-item{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+  .drawer-item:hover{background:var(--bg-2)}
+  .drawer-item input[type="checkbox"]{accent-color:var(--cyan);width:17px;height:17px;cursor:pointer;flex-shrink:0;margin:0}
+  .drawer-item .dit-info{flex:1;min-width:0}
+  .drawer-item .dit-cod{color:var(--cyan);font-weight:700;font-size:13px}
+  .drawer-item .dit-name{color:var(--text);font-size:12px;font-weight:500}
+  .drawer-item .dit-sub{font-size:10px;color:var(--muted);margin-top:2px}
+  .drawer-item .dit-tipo{display:inline-block;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;border:1px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  .drawer-item .dit-tipo.PINTURA{color:var(--purple);border-color:var(--purple)}
+  .drawer-item .dit-tipo.TUBULA{color:var(--cyan);border-color:var(--cyan)}
+  .drawer-item .dit-tipo.INFRA{color:var(--orange);border-color:var(--orange)}
+  .drawer-item .dit-tipo.AZMAQ{color:var(--green);border-color:var(--green)}
+  .drawer-item .dit-tipo.OUTROS{color:var(--yellow);border-color:var(--yellow)}
+  .drawer-item .dit-default{display:inline-block;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;background:var(--bg-2);color:var(--muted);border:1px solid var(--border)}
+  .drawer-item .dit-default.SIM{color:var(--green);border-color:var(--green)}
+  .drawer-item .dit-default.AINDA{color:var(--yellow);border-color:var(--yellow)}
+  .drawer-item .dit-default.NAO{color:var(--muted)}
+  .drawer-item .dit-override-tag{font-size:9px;color:var(--orange);font-weight:700;margin-left:6px}
+
+  /* Toast de notificação (undo, etc) */
+  .toast-aztech{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--cyan);color:var(--text);padding:12px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 3px rgba(0,212,255,.1);z-index:1000;opacity:0;transform:translateY(12px);transition:opacity .2s, transform .2s;pointer-events:none;display:flex;align-items:center;gap:10px}
+  .toast-aztech.show{opacity:1;transform:translateY(0)}
+  .toast-aztech .toast-icon{font-size:16px}
+  .toast-aztech.warn{border-color:var(--orange);box-shadow:0 6px 22px rgba(0,0,0,.5),0 0 0 3px rgba(251,146,60,.15)}
+  .toast-aztech.warn .toast-icon{color:var(--orange)}
+
+  /* utilities */
+  .hidden{display:none !important}
+  .arrow-up::before{content:"▲ ";color:var(--green)}
+  .arrow-down::before{content:"▼ ";color:var(--red)}
+  .arrow-flat::before{content:"— ";color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="brand">
+    <div class="logo">A</div>
+    <div>
+      <h1>Aztech · Acompanhamento de Margens</h1>
+      <div class="sub">Comparativo semanal por Centro de Negócio</div>
+    </div>
+  </div>
+  <div class="uploads">
+    <label class="upload" id="upPrev">
+      <span class="lbl">📅 Semana anterior</span>
+      <span class="fname empty">Clique ou arraste o .xlsx aqui</span>
+      <input type="file" accept=".xlsx,.xls" data-target="prev">
+    </label>
+    <label class="upload" id="upCurr">
+      <span class="lbl">📊 Semana atual</span>
+      <span class="fname empty">Clique ou arraste o .xlsx aqui</span>
+      <input type="file" accept=".xlsx,.xls" data-target="curr">
+    </label>
+  </div>
+</header>
+
+<!-- EMPTY STATE -->
+<div id="emptyState" class="empty-state">
+  <h2>Carregue as duas versões da planilha para comparar</h2>
+  <p>O dashboard lê a aba <b>ACOMPANHAMENTO CUSTOS</b> de cada arquivo e mostra a variação obra a obra.</p>
+  <ul class="steps">
+    <li>1. Selecione a planilha da <b>semana anterior</b> no botão acima.</li>
+    <li>2. Selecione a planilha da <b>semana atual</b> ao lado.</li>
+    <li>3. Use os filtros por <b>tipo de obra</b> para a apresentação à diretoria.</li>
+  </ul>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+  <!-- HERO CARDS — KPIs CONSOLIDADOS -->
+  <section class="hero-section collapsible" id="heroSection" data-section-id="hero" data-section-title="💵 KPIs Consolidados (Faturamento + Custos)">
+    <div class="kpi-row-lbl">💵 FATURAMENTO</div>
+    <div class="kpi-grid kpi-grid-4">
+      <div class="kpi-card" id="kpiPropostas"></div>
+      <div class="kpi-card" id="kpiFaturado"></div>
+      <div class="kpi-card" id="kpiAFaturar"></div>
+      <div class="kpi-card kpi-gauge-card" id="kpiPctFat"></div>
+    </div>
+    <div class="kpi-row-lbl">💸 CUSTOS &amp; EXECUÇÃO</div>
+    <div class="kpi-grid kpi-grid-5">
+      <div class="kpi-card" id="kpiGasto"></div>
+      <div class="kpi-card" id="kpiGastoPrev"></div>
+      <div class="kpi-card" id="kpiLimite"></div>
+      <div class="kpi-card kpi-gauge-card" id="kpiAvanco"></div>
+      <div class="kpi-card kpi-gauge-card" id="kpiAvancoSim"></div>
+    </div>
+  </section>
+
+  <!-- FILTROS -->
+  <div class="filters">
+    <span class="lbl">Tipo de obra:</span>
+    <div id="filtros"></div>
+    <div class="divider"></div>
+    <span class="lbl">Visibilidade:</span>
+    <div class="vis-group" id="visivelGroup">
+      <span class="vis-chip on" data-vis="sim" title="Obras ativas (col VISÍVEL=SIM ou Status Engenharia = EM ANDAMENTO/CONTÍNUO)">Apenas Ativas</span>
+      <span class="vis-chip" data-vis="incluir" title="Ativas + ainda não iniciadas">+ Ainda não</span>
+      <span class="vis-chip" data-vis="todos" title="Todas as obras independente do status">Todas</span>
+    </div>
+    <div class="criterio-chip hidden" id="criterioChip"></div>
+    <div class="sp"></div>
+    <button class="expand-all-btn hidden" id="btnExpandAll" title="Expandir todos os blocos minimizados">⊕ Expandir tudo <span id="collapsedCount">0</span></button>
+    <button class="manage-btn" id="btnManage">⚙ Gerenciar obras <span class="badge hidden" id="overrideBadge">0</span></button>
+    <div class="meta">
+      <b id="metaObras">0</b> de <b id="metaTotal">0</b> obras ·
+      Anterior: <b id="metaPrev">—</b> ·
+      Atual: <b id="metaCurr">—</b> ·
+      <span title="Pressione Ctrl+Z para desfazer a última ação" style="color:var(--cyan);font-weight:600;cursor:help">↶ Ctrl+Z</span>
+    </div>
+  </div>
+
+  <!-- DRAWER DE GERENCIAMENTO -->
+  <div class="drawer-bg" id="drawerBg"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-header">
+      <h2>Gerenciar obras visíveis</h2>
+      <span class="drawer-stats" id="drawerStats"></span>
+      <button class="drawer-close" id="drawerClose" title="Fechar">×</button>
+    </div>
+    <div class="drawer-actions">
+      <button data-action="all-on">✓ Marcar todas</button>
+      <button data-action="all-off">✗ Desmarcar todas</button>
+      <button data-action="apply-sim">Aplicar SIM da planilha</button>
+      <button data-action="reset" class="reset">⟲ Restaurar padrão (limpar overrides)</button>
+    </div>
+    <div class="drawer-search">
+      <input type="text" id="drawerSearch" placeholder="🔍 Buscar por código, descrição, cliente ou filial...">
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+
+  <!-- CARDS POR TIPO -->
+  <div class="collapsible" data-section-id="types" data-section-title="📦 Resumo por Tipo de Obra">
+    <div id="typeCards" class="type-cards"></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-row">
+    <div class="chart-card collapsible" data-section-id="composition" data-section-title="🥯 Composição Plano vs. Realidade">
+      <h3>Composição financeira — Plano original vs. Realidade atual <span class="comp-sub">(100% = valor da proposta)</span></h3>
+      <div class="comp-grid">
+        <div class="comp-side">
+          <div class="comp-label">PLANO ORIGINAL</div>
+          <div class="comp-wrap">
+            <canvas id="chartPlano"></canvas>
+            <div class="comp-center" id="centerPlano">
+              <div class="comp-center-lbl">Margem planejada</div>
+              <div class="comp-center-val" id="centerPlanoVal">—</div>
+            </div>
+          </div>
+          <div class="comp-legend" id="legendPlano"></div>
+        </div>
+        <div class="comp-side">
+          <div class="comp-label">REALIDADE ATUAL</div>
+          <div class="comp-wrap">
+            <canvas id="chartReal"></canvas>
+            <div class="comp-center" id="centerReal">
+              <div class="comp-center-lbl">Margem projetada</div>
+              <div class="comp-center-val" id="centerRealVal">—</div>
+              <div class="comp-center-delta" id="centerRealDelta"></div>
+            </div>
+          </div>
+          <div class="comp-legend" id="legendReal"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card collapsible" data-section-id="gauges" data-section-title="📊 Painel de Saúde (4 velocímetros)">
+      <h3>Painel de saúde — KPIs do conjunto filtrado <span class="comp-sub">recalcula com filtros e overrides</span></h3>
+      <div class="gauges-grid" id="gaugesGrid"></div>
+    </div>
+  </div>
+
+  <!-- ANÁLISE POR CATEGORIA DE GASTO (CURVA ABC) -->
+  <div class="chart-card collapsible" data-section-id="categorias" data-section-title="🧾 Gastos por Categoria (Curva ABC)">
+    <div class="cat-header">
+      <h3>Gastos por categoria — Curva ABC <span class="comp-sub">exclui impostos (IRPJ · CSLL · ISS · PIS · COFINS) · respeita filtros e overrides</span></h3>
+      <select id="catCnSelect" class="cat-select" title="Escolha uma obra para ver só a quebra dela"></select>
+    </div>
+    <div id="catBody"></div>
+  </div>
+
+  <!-- FLUXO DE CAIXA — DESEMBOLSO × RECEBIMENTO -->
+  <div class="chart-card collapsible" data-section-id="fluxo" data-section-title="💰 Fluxo de Caixa — Desembolso × Recebimento">
+    <div class="cat-header">
+      <h3>Fluxo de caixa <span id="fluxoAno"></span> — desembolso × recebimento <span class="comp-sub">visão caixa (por vencimento, inclui impostos) · Real das abas IMP. + Previsto das abas PREV.</span></h3>
+      <select id="fluxoCnSelect" class="cat-select" title="Escolha uma obra para ver só o fluxo dela"></select>
+    </div>
+    <div class="fluxo-chips" id="fluxoChips"></div>
+    <div class="fluxo-wrap"><canvas id="chartFluxo"></canvas></div>
+    <div id="fluxoResumo"></div>
+  </div>
+
+  <!-- TABELA DE MARGENS -->
+  <div class="table-card collapsible" data-section-id="tabela" data-section-title="📋 Tabela detalhada — comparação obra a obra">
+    <div class="thead">
+      <h2>Tabela detalhada — comparação obra a obra</h2>
+      <span class="meta" style="color:var(--muted);font-size:12px">Valor pequeno acima = semana anterior · Setinha abaixo = variação</span>
+      <div class="col-toggle-wrap">
+        <button class="col-toggle-btn" id="btnColumns" title="Mostrar/esconder colunas">
+          <span>👁 Colunas</span>
+          <span class="count" id="colCount">10/10</span>
+        </button>
+        <div class="col-toggle-dropdown" id="colDropdown">
+          <div class="col-dd-header">Mostrar / esconder colunas</div>
+          <div class="col-dd-list" id="colDropdownList"></div>
+          <div class="col-dd-actions">
+            <button class="col-dd-reset" id="colDdReset">⟲ Mostrar todas</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scroll">
+      <table id="tabela">
+        <thead>
+          <tr>
+            <th data-sort="cod" data-col="cod" data-default-dir="asc" data-col-label="Centro de Negócio">Centro de Negócio <span class="sort-arrow"></span></th>
+            <th data-sort="resp" data-col="resp" data-default-dir="asc" data-col-label="Resp.">Resp.<span class="sub">gestor/encarregado</span><span class="sort-arrow"></span></th>
+            <th data-sort="proposta" data-col="proposta" data-col-label="Proposta">Proposta<span class="sub">valor do contrato</span><span class="sort-arrow"></span></th>
+            <th data-sort="pctFat" data-col="pctFat" data-col-label="% Faturado">% Faturado<span class="sub">receita ÷ proposta</span><span class="sort-arrow"></span></th>
+            <th data-sort="orcado" data-col="orcado" data-col-label="Orçado">Orçado<span class="sub">limite 30%</span><span class="sort-arrow"></span></th>
+            <th data-sort="realizado" data-col="realizado" data-col-label="Realizado">Realizado<span class="sub">custo gasto</span><span class="sort-arrow"></span></th>
+            <th data-sort="prevEng" data-col="prevEng" data-col-label="Custo Previsto">Custo Previsto<span class="sub">a ser gasto</span><span class="sort-arrow"></span></th>
+            <th data-sort="saldo" data-col="saldo" data-col-label="Saldo">Saldo<span class="sub">do orçado</span><span class="sort-arrow"></span></th>
+            <th data-sort="pct" data-col="pct" data-col-label="Avanço Fin.">Avanço Fin.<span class="sub">% do orçado consumido</span><span class="sort-arrow"></span></th>
+            <th data-sort="margemAtu" data-col="margemAtu" data-col-label="Margem Projetada">Margem Projetada<span class="sub">meta: 30%</span><span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Aztech · processamento local no navegador (SheetJS + Chart.js). Os arquivos não saem do seu computador.
+</footer>
+
+</div>
+
+<script>
+/* ============== STATE ============== */
+const state = {
+  prev: null,
+  curr: null,
+  filtros: ['TODOS'],
+  visivel: 'sim',                // 'sim' | 'incluir' | 'todos'  — define o DEFAULT por col J
+  overrides: new Map(),          // cod → true/false  — override manual por CN (sobrepõe o default)
+  drawerSearch: '',
+  sort: {col:null, dir:'desc'},  // ordenação atual da tabela (null = padrão por tipo + cod)
+  collapsed: new Set(),          // section IDs minimizados pelo usuário
+  criterio: null,                // critério ativo de filtro (vindo dos gauges)
+  catCN: '',                     // CN selecionado na Análise por Categoria ('' = todas da seleção) — volátil
+  catDetail: null,               // {cat, mode:'lanc'|'delta'} — drill-down aberto na Análise por Categoria (volátil)
+  catDemaisOpen: false,          // expansão da linha "Demais" (volátil)
+  fluxoCN: '',                   // CN selecionado no Fluxo de Caixa ('' = todas da seleção) — volátil
+  fluxoSeries: {dr:true, dp:true, rr:true, rp:true, saldo:true},  // séries visíveis no Fluxo de Caixa (chips) — volátil
+  hiddenCols: new Set(),         // colunas escondidas da tabela detalhada
+  history: [],                   // pilha de snapshots para Ctrl+Z (max 50)
+};
+
+/* ============== UNDO (Ctrl+Z) ============== */
+const HISTORY_MAX = 50;
+let toastTimer = null;
+
+function showToast(msg, type='ok'){
+  let t = document.getElementById('toastAztech');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toastAztech';
+    document.body.appendChild(t);
+  }
+  t.className = 'toast-aztech' + (type==='warn'?' warn':'');
+  t.innerHTML = `<span class="toast-icon">${type==='warn'?'⚠️':'↶'}</span><span>${msg}</span>`;
+  // força reflow para reativar transição
+  void t.offsetWidth;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2000);
+}
+
+function pushHistory(label){
+  state.history.push({
+    label: label || '',
+    filtros:    [...state.filtros],
+    visivel:    state.visivel,
+    overrides:  new Map(state.overrides),
+    criterio:   state.criterio,
+    sort:       {...state.sort},
+    collapsed:  new Set(state.collapsed),
+    hiddenCols: new Set(state.hiddenCols),
+  });
+  if(state.history.length > HISTORY_MAX) state.history.shift();
+}
+
+function undo(){
+  if(!state.curr){ return; }   // sem dados carregados, nada a desfazer
+  if(state.history.length === 0){
+    showToast('Nada para desfazer', 'warn');
+    return;
+  }
+  const snap = state.history.pop();
+  state.filtros    = snap.filtros;
+  state.visivel    = snap.visivel;
+  state.overrides  = snap.overrides;
+  state.criterio   = snap.criterio;
+  state.sort       = snap.sort;
+  state.collapsed  = snap.collapsed;
+  state.hiddenCols = snap.hiddenCols;
+  // Persistência
+  saveOverrides();
+  saveCollapsedState();
+  saveHiddenCols();
+  // Atualiza UI
+  buildFiltros();
+  document.querySelectorAll('#visivelGroup .vis-chip').forEach(x=>{
+    x.classList.remove('on','todos','incluir');
+    if(x.dataset.vis===state.visivel){
+      x.classList.add('on');
+      if(state.visivel==='todos') x.classList.add('todos');
+      if(state.visivel==='incluir') x.classList.add('incluir');
+    }
+  });
+  updateOverrideBadge();
+  applyCollapsedState();
+  applyColumnVisibility();
+  const drawerEl = document.getElementById('drawer');
+  if(drawerEl && drawerEl.classList.contains('open')) renderDrawer();
+  render();
+  showToast(`Ação revertida${snap.label?': '+snap.label:''} · ${state.history.length} restante(s)`);
+}
+
+document.addEventListener('keydown', (e)=>{
+  const isUndo = (e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey;
+  if(!isUndo) return;
+  // Não dispara em campos de input/textarea (busca do drawer, etc.)
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if(tag==='input' || tag==='textarea') return;
+  e.preventDefault();
+  undo();
+});
+
+/* ============== CRITÉRIOS DE FILTRO (dos gauges clicáveis) ============== */
+const CRITERIOS = {
+  prejuizo:     { label:'⚡ Em prejuízo (margem < 0%)',     icon:'🔴',
+                  filter: r => r.proposta>0 && r.margemAtu < 0 },
+  estouro:      { label:'⚡ Estouro de orçado (> 100%)',     icon:'🔴',
+                  filter: r => r.orcado>0 && (r.realizado/r.orcado) > 1.0 },
+  saudaveis:    { label:'⚡ Saudáveis (margem ≥ 30%)',       icon:'🟢',
+                  filter: r => r.proposta>0 && r.margemAtu >= 0.30 },
+  foraDaMeta:   { label:'⚡ Fora da meta (margem < 30%)',    icon:'🟡',
+                  filter: r => r.proposta>0 && r.margemAtu < 0.30 },
+  riscoBaixa:   { label:'⚡ Risco — margem < 20%',           icon:'🟠',
+                  filter: r => r.proposta>0 && r.margemAtu < 0.20 },
+};
+function passaCriterio(r){
+  if(!state.criterio) return true;
+  const c = CRITERIOS[state.criterio];
+  return c ? c.filter(r) : true;
+}
+function setCriterio(name){
+  pushHistory('filtro por critério');
+  // toggle: clicar no mesmo critério ativo limpa
+  if(state.criterio === name) state.criterio = null;
+  else state.criterio = name;
+  render();
+}
+function clearCriterio(){
+  pushHistory('limpar critério');
+  state.criterio = null;
+  render();
+}
+
+/* Classifica a "visibilidade efetiva" de um CN.
+   Lógica unificada (compatível com legacy e unified):
+   1. Se col VISÍVEL tem valor explícito → usa esse valor (sobrepõe tudo)
+   2. Se col VISÍVEL está vazia E temos Status Engenharia → usa Status
+      ('EM ANDAMENTO' + 'CONTÍNUO' = sim, 'FINALIZADO' = nao, outros = nao)
+   3. Sem nada → 'nao' */
+function classifyVisivel(v, statusEng){
+  if(v!=null){
+    const s = String(v).trim().toUpperCase();
+    if(s==='SIM') return 'sim';
+    if(s.includes('AINDA')) return 'ainda';
+    if(s==='NÃO' || s==='NAO') return 'nao';
+    // valor estranho — cai no fallback
+  }
+  if(statusEng){
+    const st = String(statusEng).trim().toUpperCase();
+    if(st==='FINALIZADO') return 'nao';
+    if(st==='EM ANDAMENTO' || st==='CONTÍNUO' || st==='CONTINUO') return 'sim';
+  }
+  return 'nao';
+}
+
+/* Default vindo da combinação (modo de visibilidade × classificação) */
+function defaultVisivel(r){
+  const cls = classifyVisivel(r.visivel, r.statusEng);
+  if(state.visivel==='todos')   return true;
+  if(state.visivel==='incluir') return cls==='sim' || cls==='ainda';
+  return cls==='sim';
+}
+
+/* Visibilidade EFETIVA = override (se houver) OU default */
+function passaVisivel(r){
+  if(state.overrides.has(r.cod)) return state.overrides.get(r.cod);
+  return defaultVisivel(r);
+}
+
+/* ============== OVERRIDES (persistência) ============== */
+const STORAGE_KEY = 'aztech-dashboard-overrides';
+function loadOverrides(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) state.overrides = new Map(JSON.parse(raw));
+  }catch(e){ console.warn('localStorage indisponível', e); }
+}
+function saveOverrides(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...state.overrides]));
+  }catch(e){}
+}
+function setOverride(cod, value){
+  // se o override é igual ao default, removemos (mantém limpo)
+  const r = state.curr.rows.find(x=>x.cod===cod);
+  if(r && defaultVisivel(r) === value){
+    state.overrides.delete(cod);
+  } else {
+    state.overrides.set(cod, value);
+  }
+  saveOverrides();
+  updateOverrideBadge();
+}
+function clearAllOverrides(){
+  pushHistory('limpar overrides');
+  state.overrides.clear();
+  saveOverrides();
+  updateOverrideBadge();
+}
+function updateOverrideBadge(){
+  const b = document.getElementById('overrideBadge');
+  if(!b) return;
+  if(state.overrides.size===0){ b.classList.add('hidden'); }
+  else { b.classList.remove('hidden'); b.textContent = state.overrides.size; }
+}
+
+/* ============== COLAPSO DE BLOCOS ============== */
+const STORAGE_KEY_COLLAPSED = 'aztech-dashboard-collapsed';
+function loadCollapsedState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY_COLLAPSED);
+    if(raw) state.collapsed = new Set(JSON.parse(raw));
+  }catch(e){}
+}
+function saveCollapsedState(){
+  try{ localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify([...state.collapsed])); }catch(e){}
+}
+function updateExpandAllBtn(){
+  const btn = document.getElementById('btnExpandAll');
+  const cnt = document.getElementById('collapsedCount');
+  if(!btn) return;
+  if(state.collapsed.size === 0){
+    btn.classList.add('hidden');
+  } else {
+    btn.classList.remove('hidden');
+    if(cnt) cnt.textContent = `(${state.collapsed.size})`;
+  }
+}
+function toggleCollapse(sectionId){
+  pushHistory('minimizar/expandir bloco');
+  const isCollapsed = state.collapsed.has(sectionId);
+  if(isCollapsed) state.collapsed.delete(sectionId);
+  else state.collapsed.add(sectionId);
+  saveCollapsedState();
+  applyCollapsedState();
+}
+function applyCollapsedState(){
+  document.querySelectorAll('.collapsible[data-section-id]').forEach(el=>{
+    const id = el.dataset.sectionId;
+    const isCollapsed = state.collapsed.has(id);
+    el.classList.toggle('collapsed', isCollapsed);
+    const btn = el.querySelector(':scope > .collapse-btn');
+    if(btn){
+      btn.innerHTML = isCollapsed
+        ? '<span class="chev">▶</span> Expandir'
+        : '<span class="chev">▼</span> Minimizar';
+      btn.title = isCollapsed ? 'Expandir este bloco' : 'Minimizar este bloco';
+    }
+  });
+  updateExpandAllBtn();
+}
+function initCollapsibles(){
+  document.querySelectorAll('.collapsible[data-section-id]').forEach(el=>{
+    if(el.dataset.collapsibleInit) return; // já inicializado
+    el.dataset.collapsibleInit = '1';
+    const id = el.dataset.sectionId;
+    const title = el.dataset.sectionTitle || id;
+    // botão de colapsar
+    const btn = document.createElement('button');
+    btn.className = 'collapse-btn';
+    btn.innerHTML = '<span class="chev">▼</span> Minimizar';
+    btn.title = 'Minimizar este bloco';
+    btn.onclick = (e)=>{ e.stopPropagation(); toggleCollapse(id); };
+    el.insertBefore(btn, el.firstChild);
+    // placeholder mostrado quando colapsado
+    const ph = document.createElement('div');
+    ph.className = 'collapsed-placeholder';
+    ph.innerHTML = `<span class="pl-title">${title}</span><span class="pl-expand">⊕ clique para expandir</span>`;
+    ph.onclick = ()=> toggleCollapse(id);
+    el.appendChild(ph);
+  });
+  // botão "Expandir tudo"
+  const eb = document.getElementById('btnExpandAll');
+  if(eb && !eb.dataset.wired){
+    eb.dataset.wired = '1';
+    eb.onclick = ()=>{
+      pushHistory('expandir tudo');
+      state.collapsed.clear();
+      saveCollapsedState();
+      applyCollapsedState();
+    };
+  }
+  applyCollapsedState();
+}
+
+/* ============== VISIBILIDADE DE COLUNAS DA TABELA ============== */
+const STORAGE_KEY_HIDDEN_COLS = 'aztech-dashboard-hidden-cols';
+const LOCKED_COLS = new Set(['cod']);   // colunas que NÃO podem ser escondidas
+function loadHiddenCols(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY_HIDDEN_COLS);
+    if(raw) state.hiddenCols = new Set(JSON.parse(raw));
+  }catch(e){}
+  LOCKED_COLS.forEach(c=>state.hiddenCols.delete(c));
+}
+function saveHiddenCols(){
+  try{ localStorage.setItem(STORAGE_KEY_HIDDEN_COLS, JSON.stringify([...state.hiddenCols])); }catch(e){}
+}
+function applyColumnVisibility(){
+  let styleEl = document.getElementById('colVisStyle');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = 'colVisStyle';
+    document.head.appendChild(styleEl);
+  }
+  const hidden = [...state.hiddenCols];
+  styleEl.textContent = hidden.map(col=>`#tabela [data-col="${col}"]{display:none}`).join('\n');
+  const totalEl = document.getElementById('colCount');
+  if(totalEl){
+    const totalCols = document.querySelectorAll('#tabela thead th[data-col]').length;
+    totalEl.textContent = `${totalCols - state.hiddenCols.size}/${totalCols}`;
+  }
+}
+function toggleColumn(col){
+  if(LOCKED_COLS.has(col)) return;
+  pushHistory('alternar coluna');
+  if(state.hiddenCols.has(col)) state.hiddenCols.delete(col);
+  else state.hiddenCols.add(col);
+  saveHiddenCols();
+  applyColumnVisibility();
+  renderColumnsDropdown();
+}
+function renderColumnsDropdown(){
+  const list = document.getElementById('colDropdownList');
+  if(!list) return;
+  const ths = [...document.querySelectorAll('#tabela thead th[data-col]')];
+  list.innerHTML = ths.map(th=>{
+    const col = th.dataset.col;
+    const label = th.dataset.colLabel || col;
+    const isHidden = state.hiddenCols.has(col);
+    const isLocked = LOCKED_COLS.has(col);
+    return `
+      <label class="col-dd-item ${isLocked?'locked':''}">
+        <input type="checkbox" data-col="${col}" ${isHidden?'':'checked'} ${isLocked?'disabled':''}>
+        <span>${label}</span>
+      </label>`;
+  }).join('');
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.onchange = ()=> toggleColumn(cb.dataset.col);
+  });
+}
+function bindColumnsToggle(){
+  const btn = document.getElementById('btnColumns');
+  const dd  = document.getElementById('colDropdown');
+  const reset = document.getElementById('colDdReset');
+  if(!btn || !dd) return;
+  btn.onclick = (e)=>{
+    e.stopPropagation();
+    dd.classList.toggle('open');
+    btn.classList.toggle('open');
+    if(dd.classList.contains('open')) renderColumnsDropdown();
+  };
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.col-toggle-wrap')){
+      dd.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+  if(reset){
+    reset.onclick = ()=>{
+      pushHistory('mostrar todas as colunas');
+      state.hiddenCols.clear();
+      saveHiddenCols();
+      applyColumnVisibility();
+      renderColumnsDropdown();
+    };
+  }
+}
+
+const TIPOS_ORDEM = ['PINTURA INDUSTRIAL','TUBULAÇÃO','INFRAESTRUTURA','AZ-MAQ','OUTROS SERVIÇOS'];
+const TIPO_LABEL  = {'PINTURA INDUSTRIAL':'Pintura','TUBULAÇÃO':'Tubulação','INFRAESTRUTURA':'Infraestrutura','AZ-MAQ':'Az-Maq','OUTROS SERVIÇOS':'Outros'};
+const TIPO_COR    = {'PINTURA INDUSTRIAL':'#b794f4','TUBULAÇÃO':'#00d4ff','INFRAESTRUTURA':'#fb923c','AZ-MAQ':'#4ade80','OUTROS SERVIÇOS':'#fde047'};
+const TIPO_SHORT  = {'PINTURA INDUSTRIAL':'PINTURA','TUBULAÇÃO':'TUBULA','INFRAESTRUTURA':'INFRA','AZ-MAQ':'AZMAQ','OUTROS SERVIÇOS':'OUTROS'};
+
+/* ============== FORMATTERS ============== */
+const fmtBRL = v=>{
+  if(v==null||isNaN(v))return '—';
+  const abs=Math.abs(v);
+  if(abs>=1_000_000)return 'R$ '+(v/1_000_000).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'M';
+  if(abs>=1_000)return 'R$ '+(v/1_000).toLocaleString('pt-BR',{maximumFractionDigits:0})+'K';
+  return 'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0});
+};
+const fmtBRLfull = v=>v==null||isNaN(v)?'—':'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = v=>v==null||isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const fmtPP  = v=>v==null||isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'pp';
+
+/* ============== FILE PARSING ============== */
+async function readXLSX(file){
+  const buf = await file.arrayBuffer();
+  return parseWorkbook(buf, file.name);
+}
+function parseWorkbook(buf, name){
+  const file = {name};
+  const wb  = XLSX.read(buf,{type:'array',cellDates:true,cellFormula:true}); // cellFormula:true → necessário p/ detectar consolidações (XFT, XML, 73+120...) na col D
+  // ===== DETECTA FORMATO =====
+  // - LEGACY (CONTROLE_FINANCEIRO v2): tem aba ACOMPANHAMENTO CUSTOS
+  // - UNIFIED (BASE DE DADOS DE OBRA): tudo em CENTROS DE NEGÓCIO com 25+ cols, sem ACOMPANHAMENTO
+  const hasLegacy = wb.SheetNames.includes('ACOMPANHAMENTO CUSTOS');
+  const hasCentros = wb.SheetNames.includes('CENTROS DE NEGÓCIO');
+  if(hasLegacy)   return parseLegacy(wb, file);
+  if(hasCentros)  return parseUnified(wb, file);
+  throw new Error("Formato não reconhecido em "+file.name+". Esperado 'ACOMPANHAMENTO CUSTOS' (legacy) ou 'CENTROS DE NEGÓCIO' (unified) na planilha.");
+}
+
+/* ============== CATEGORIAS DE GASTO (IMP. DESPESAS) ==============
+   Replica a fórmula SUMPRODUCT da col D da ACOMPANHAMENTO CUSTOS:
+   soma lançamentos por Cód. CN (col I), data de COMPETÊNCIA (col F) dentro
+   da janela C2:D2, excluindo as 5 categorias de imposto. Validado 56/56 CNs
+   ao centavo contra a planilha de 22.06.2026. */
+const CAT_IMPOSTOS = new Set(['IRPJ','CSLL','ISS PROPRIO','PIS','COFINS']);
+
+function toDate(v){
+  if(v instanceof Date) return v;
+  if(typeof v==='number' && v>20000) return new Date(Math.round((v-25569)*86400*1000)); // serial Excel
+  return null;
+}
+
+function extractCategorias(wb, janela){
+  // → {agg: Map(cod → Map(categoria → valor)), lanc: [lançamentos individuais]}. janela {ini,fim} opcional.
+  if(!wb.SheetNames.includes('IMP. DESPESAS')) return null;
+  const ws   = wb.Sheets['IMP. DESPESAS'];
+  const json = XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const agg  = new Map();
+  const lanc = [];
+  for(let i=1;i<json.length;i++){
+    const r = json[i]; if(!r) continue;
+    const val = Number(r[3]); if(!val || isNaN(val)) continue;
+    const cat = r[1]==null ? '(sem categoria)' : String(r[1]).trim();
+    if(CAT_IMPOSTOS.has(cat)) continue;
+    let comp = toDate(r[5]);
+    if(janela){
+      if(!comp || comp < janela.ini || comp > janela.fim) continue;
+    }
+    const cod = r[8]==null ? '' : String(r[8]).trim();
+    if(!cod) continue;
+    const v = Math.abs(val);
+    let m = agg.get(cod); if(!m){ m = new Map(); agg.set(cod, m); }
+    m.set(cat, (m.get(cat)||0) + v);
+    lanc.push({cod, cat, v, comp, desc: r[4]==null?'':String(r[4]).trim(), conta: r[6]==null?'':String(r[6]).trim()});
+  }
+  return {agg, lanc};
+}
+
+function mergedCats(agg, cod, comps){
+  // categorias do próprio CN + dos CNs consolidados nele (XFT=93+136+A2+A6, 73 inclui 120, etc.)
+  const out = new Map();
+  const add = c => { const m = agg.get(c); if(m) m.forEach((v,cat)=>out.set(cat,(out.get(cat)||0)+v)); };
+  add(cod); (comps||[]).forEach(add);
+  return out;
+}
+
+/* ============== FLUXO DE CAIXA (PREV. CUSTOS / PREV. RECEITAS / IMP.) ==============
+   Visão CAIXA (por data de vencimento, SEM excluir impostos — diferente da análise
+   por categoria, que é visão CUSTO por competência sem impostos).
+   - despPrev: colunas "Mês Prev" do grid PREV. CUSTOS (previsão manual da engenharia)
+   - despReal: calculado da IMP. DESPESAS por VENCIMENTO no ano de referência.
+     (o grid "Mês Real" da PREV. CUSTOS referencia workbook EXTERNO defasado — não usar)
+   - recPrev:  grid PREV. RECEITAS (Jan..Dez)
+   - recReal:  IMP. RECEITAS por colunas Ano/Mês (fallback competência)
+   - ano: extraído da fórmula YEAR(...)=YYYY da célula G4 da PREV. CUSTOS */
+const MESES_HDR = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function colsMeses(headerRow, sufixo){
+  // Localiza as 12 colunas dos meses PELO NOME no cabeçalho (robusto a colunas
+  // inseridas como STATUS/Total). sufixo: 'prev' casa "Jan Prev"; '' casa "Jan".
+  if(!headerRow) return null;
+  const idx = new Array(12).fill(-1);
+  headerRow.forEach((h,i)=>{
+    if(h==null) return;
+    const s = String(h).trim().toLowerCase().replace(/\s+/g,' ');
+    MESES_HDR.forEach((m,mi)=>{
+      const alvo = sufixo ? m+' '+sufixo : m;
+      if(s===alvo && idx[mi]===-1) idx[mi] = i;
+    });
+  });
+  return idx.every(i=>i>=0) ? idx : null;
+}
+
+function extractFluxo(wb){
+  const out = {ano:(new Date()).getFullYear(), despReal:new Map(), despPrev:new Map(),
+               recReal:new Map(), recPrev:new Map(), temPrevCustos:false, temPrevReceitas:false, temAbas:false};
+  const wsp = wb.Sheets['PREV. CUSTOS'];
+  if(wsp){
+    out.temAbas = true;
+    const g4 = wsp['G4'];
+    const m = g4 && g4.f && String(g4.f).match(/YEAR\([^)]*\)\s*=\s*(\d{4})/);
+    if(m) out.ano = +m[1];
+    const json = XLSX.utils.sheet_to_json(wsp,{header:1,defval:null,raw:true});
+    // meses pelo cabeçalho ("Jan Prev"); fallback: posições fixas F,H,J...AB
+    const cols = colsMeses(json[2],'prev') || [5,7,9,11,13,15,17,19,21,23,25,27];
+    for(let i=3;i<json.length;i++){
+      const r = json[i]; if(!r || r[0]==null || r[0]==='') continue;
+      const cod = String(r[0]).trim(); if(!cod) continue;
+      const arr = new Array(12).fill(0);
+      for(let mi=0;mi<12;mi++){ const v = Number(r[cols[mi]]); if(v && !isNaN(v)) arr[mi] = v; }
+      if(arr.some(v=>v)) out.temPrevCustos = true;
+      out.despPrev.set(cod, arr);
+    }
+  }
+  const wspr = wb.Sheets['PREV. RECEITAS'];
+  if(wspr){
+    const json = XLSX.utils.sheet_to_json(wspr,{header:1,defval:null,raw:true});
+    // aceita os 2 layouts: pares "Jan Prev"/"Jan Real" (igual PREV. CUSTOS) ou colunas simples "Jan".
+    // Busca pelo NOME no cabeçalho — imune a colunas inseridas (STATUS, Total Previsto etc.)
+    const cols = colsMeses(json[2],'prev') || colsMeses(json[2],'') || [3,4,5,6,7,8,9,10,11,12,13,14];
+    for(let i=3;i<json.length;i++){
+      const r = json[i]; if(!r || r[0]==null || r[0]==='') continue;
+      const cod = String(r[0]).trim(); if(!cod) continue;
+      const arr = new Array(12).fill(0);
+      for(let mi=0;mi<12;mi++){ const v = Number(r[cols[mi]]); if(v && !isNaN(v)) arr[mi] = v; }
+      if(arr.some(v=>v)) out.temPrevReceitas = true;
+      out.recPrev.set(cod, arr);
+    }
+  }
+  const wsd = wb.Sheets['IMP. DESPESAS'];
+  if(wsd){
+    out.temAbas = true;
+    const json = XLSX.utils.sheet_to_json(wsd,{header:1,defval:null,raw:true});
+    for(let i=1;i<json.length;i++){
+      const r = json[i]; if(!r) continue;
+      const val = Number(r[3]); if(!val || isNaN(val)) continue;
+      const venc = toDate(r[0]);
+      if(!venc || venc.getFullYear()!==out.ano) continue;
+      const cod = r[8]==null ? '' : String(r[8]).trim(); if(!cod) continue;
+      let arr = out.despReal.get(cod); if(!arr){ arr = new Array(12).fill(0); out.despReal.set(cod, arr); }
+      arr[venc.getMonth()] += Math.abs(val);
+    }
+  }
+  const wsr = wb.Sheets['IMP. RECEITAS'];
+  if(wsr){
+    const json = XLSX.utils.sheet_to_json(wsr,{header:1,defval:null,raw:true});
+    for(let i=1;i<json.length;i++){
+      const r = json[i]; if(!r) continue;
+      const val = Number(r[4]); if(!val || isNaN(val)) continue;
+      const comp = toDate(r[5]);
+      let ano = Number(r[7]) || (comp ? comp.getFullYear() : 0);
+      let mes = Number(r[8]) || (comp ? comp.getMonth()+1 : 0);
+      if(ano!==out.ano || !mes || mes<1 || mes>12) continue;
+      const cod = r[6]==null ? '' : String(r[6]).trim(); if(!cod) continue;
+      let arr = out.recReal.get(cod); if(!arr){ arr = new Array(12).fill(0); out.recReal.set(cod, arr); }
+      arr[mes-1] += Math.abs(val);
+    }
+  }
+  return out;
+}
+
+/* ============== PARSER LEGACY (CONTROLE_FINANCEIRO v2 atualizada) ============== */
+function parseLegacy(wb, file){
+  const ws   = wb.Sheets['ACOMPANHAMENTO CUSTOS'];
+  const json = XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const rows = [];
+  for(let i=3;i<json.length;i++){
+    const r = json[i];
+    if(!r || r[0]==null || r[0]==='' ) continue;
+    const cod = String(r[0]).trim();
+    if(!cod) continue;
+    rows.push({
+      cod,
+      cn:        r[1]||'',
+      orcado:    Number(r[2])||0,
+      realizado: Number(r[3])||0,
+      prevEng:   Number(r[4])||0,
+      saldo:     Number(r[5])||0,
+      margemOrig:Number(r[6])||0,
+      margemAtu: Number(r[7])||0,
+      desvio:    Number(r[8])||0,
+      visivel:   r[9],
+      obs:       r[10]||'',
+      resp:      r[12]||'',
+      tipo:      r[13]||'OUTROS SERVIÇOS',
+      proposta:  Number(r[14])||0,
+      imposto:   Number(r[15])||0,
+      statusEng: '',                    // não existe em legacy
+      receita:       0,
+      saldoFaturar:  0,
+      pctFaturado:   0,
+    });
+  }
+  // Junta ACOMPANHAMENTO RECEITAS se existir
+  const recMap = new Map();
+  if(wb.SheetNames.includes('ACOMPANHAMENTO RECEITAS')){
+    const wsR   = wb.Sheets['ACOMPANHAMENTO RECEITAS'];
+    const jsonR = XLSX.utils.sheet_to_json(wsR,{header:1,defval:null,raw:true});
+    for(let i=3;i<jsonR.length;i++){
+      const r = jsonR[i];
+      if(!r || r[0]==null || r[0]==='' ) continue;
+      const cod = String(r[0]).trim();
+      if(!cod) continue;
+      recMap.set(cod, {
+        receita:      Number(r[3])||0,
+        saldoFaturar: Number(r[4])||0,
+        pctFaturado:  Number(r[5])||0,
+      });
+    }
+    rows.forEach(row=>{
+      const rec = recMap.get(row.cod);
+      if(rec){ row.receita = rec.receita; row.saldoFaturar = rec.saldoFaturar; row.pctFaturado = rec.pctFaturado; }
+      else { row.saldoFaturar = row.proposta; }
+    });
+  } else {
+    rows.forEach(row=>{ row.saldoFaturar = row.proposta; });
+  }
+
+  // ===== CATEGORIAS DE GASTO (IMP. DESPESAS) =====
+  // Janela de competência: células C2/D2 da ACOMPANHAMENTO CUSTOS (linha 2 = json[1])
+  const ini = toDate(json[1] && json[1][2]);
+  const fim = toDate(json[1] && json[1][3]);
+  const extr = extractCategorias(wb, (ini && fim) ? {ini, fim} : null);
+  const aggCat = extr && extr.agg;
+  if(aggCat){
+    // Detecta consolidações lendo as fórmulas da col D (refs "Dnn" sem $):
+    //   "=SUMPRODUCT(...)+D31" (73 inclui 120) · "=D14+D45+D49+D52" (XFT) etc.
+    const codAtRow = new Map();   // linha da planilha → cod
+    for(let i=3;i<json.length;i++){
+      const r = json[i];
+      if(r && r[0]!=null && String(r[0]).trim()) codAtRow.set(i+1, String(r[0]).trim());
+    }
+    const compsByCod = new Map(); // cod → [cods componentes]
+    codAtRow.forEach((cod, sheetRow)=>{
+      const cell = ws['D'+sheetRow];
+      if(!cell || !cell.f) return;
+      const semRanges = String(cell.f).replace(/[A-Z]+\$\d+/g,''); // remove refs com $ (ranges do SUMPRODUCT)
+      const refs = [...semRanges.matchAll(/\bD(\d+)\b/g)].map(m=>+m[1]).filter(n=>n>=4 && n!==sheetRow);
+      if(refs.length){
+        const comps = refs.map(n=>codAtRow.get(n)).filter(Boolean);
+        if(comps.length) compsByCod.set(cod, comps);
+      }
+    });
+    rows.forEach(row=>{
+      row.catComps = compsByCod.get(row.cod) || [];
+      row.cats     = mergedCats(aggCat, row.cod, row.catComps);
+    });
+  } else {
+    rows.forEach(row=>{ row.catComps = []; row.cats = null; });
+  }
+
+  // ===== RECEITAS DE CNs CONSOLIDADOS =====
+  // A ACOMP. RECEITAS pode ter só as linhas individuais (ex.: 129/131/132/134,
+  // ocultas) e NÃO a linha do consolidado ("131 e 132"). Sem isso, o faturamento
+  // dessas obras ficava fora dos KPIs. Fallback: soma as receitas dos componentes.
+  rows.forEach(row=>{
+    if(row.receita > 0 || !(row.catComps||[]).length) return;
+    const soma = row.catComps.reduce((a,c)=>{ const m = recMap.get(c); return a + (m ? m.receita : 0); }, 0);
+    if(soma > 0){
+      row.receita      = soma;
+      row.saldoFaturar = row.proposta - soma;
+      row.pctFaturado  = row.proposta > 0 ? soma/row.proposta : 0;
+    }
+  });
+
+  return {name:file.name, rows, formato:'legacy', lanc: extr ? extr.lanc : null, fluxo: extractFluxo(wb)};
+}
+
+/* ============== PARSER UNIFIED (BASE DE DADOS DE OBRA) ============== */
+/* Tudo numa única aba CENTROS DE NEGÓCIO (26 colunas), header na linha 1.
+   Colunas: A=cod, B=desc, C=cliente, D=filial, E=status, F=cn_completo, G=tipo,
+   H=cod_proj, I=proposta, J=alíquota, K=imposto, L=orcado, M=margem_prev_rs,
+   N=%margem, O=gestor, P=status_eng, Q=visivel, R=realizado, S=prev_eng, T=saldo,
+   U=margem_atu, V=desvio, W=receita, X=saldo_faturar, Y=%faturado, Z=%custos_exec */
+function parseUnified(wb, file){
+  const ws = wb.Sheets['CENTROS DE NEGÓCIO'];
+  const json = XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  const rows = [];
+  for(let i=1;i<json.length;i++){      // header na linha 1 (index 0), dados a partir da 2
+    const r = json[i];
+    if(!r || r[0]==null || r[0]==='' ) continue;
+    const cod = String(r[0]).trim();
+    if(!cod) continue;
+    rows.push({
+      cod,
+      cn:           r[5] || '',                              // F: NOMENCLATURA CONTA AZUL
+      tipo:         r[6] || 'OUTROS SERVIÇOS',               // G
+      cod_proj:     r[7] || '',                              // H
+      proposta:     Number(r[8])||0,                         // I
+      imposto:      Number(r[10])||0,                        // K
+      orcado:       Number(r[11])||0,                        // L
+      margemOrig:   Number(r[13])||0,                        // N (% margem bruta, ~30%)
+      resp:         r[14] || '',                             // O (Gestor)
+      statusEng:    r[15] || '',                             // P (Status Engenharia — novo)
+      visivel:      r[16],                                   // Q (VISÍVEL — pode estar vazio)
+      realizado:    Number(r[17])||0,                        // R
+      prevEng:      Number(r[18])||0,                        // S
+      saldo:        Number(r[19])||0,                        // T
+      margemAtu:    Number(r[20])||0,                        // U
+      desvio:       Number(r[21])||0,                        // V
+      receita:      Number(r[22])||0,                        // W
+      saldoFaturar: Number(r[23])||0,                        // X
+      pctFaturado:  Number(r[24])||0,                        // Y
+      obs:          '',                                      // não existe mais no novo formato
+    });
+  }
+  // Categorias (se a planilha unified tiver aba IMP. DESPESAS): sem janela nem consolidações por fórmula
+  const extr = extractCategorias(wb, null);
+  rows.forEach(row=>{
+    row.catComps = [];
+    row.cats     = extr ? mergedCats(extr.agg, row.cod, []) : null;
+  });
+  return {name:file.name, rows, formato:'unified', lanc: extr ? extr.lanc : null, fluxo: extractFluxo(wb)};
+}
+
+function clienteFromCN(cn){
+  // Formato: "73 - A - PATIO DE MANOBRAS - NGD - BETIM II"  →  NGD
+  const parts = String(cn).split(' - ');
+  return parts.length>=4 ? parts[parts.length-2] : '';
+}
+function descFromCN(cn){
+  const parts = String(cn).split(' - ');
+  return parts.length>=4 ? parts.slice(2,-2).join(' - ') : cn;
+}
+function filialFromCN(cn){
+  const parts = String(cn).split(' - ');
+  return parts.length>=4 ? parts[parts.length-1] : '';
+}
+
+/**
+ * Formata o nome completo do CN para exibição:
+ *   "133 - A - TRATAMENTO E PINTURA DE VASOS - NGD - GUAMARÉ"
+ *   →  cod ciano · A em cinza · descrição em destaque · cliente/filial em cinza
+ * Se a string não estiver no formato esperado, devolve ela inteira.
+ */
+function formatCN(cn, codFallback){
+  if(!cn) return `<span class="cod-prefix">${codFallback||''}</span>`;
+  const parts = String(cn).split(' - ');
+  if(parts.length < 4){
+    // formato fora do padrão — devolve a string crua, mas mantém o cod em destaque se possível
+    return `<span class="cod-prefix">${codFallback||parts[0]||''}</span>${codFallback?' '+cn:''}`;
+  }
+  const cod      = parts[0];
+  const ab       = parts[1];
+  const desc     = parts.slice(2, -2).join(' - ');
+  const cliente  = parts[parts.length-2];
+  const filial   = parts[parts.length-1];
+  return `<span class="cod-prefix">${cod}</span>`
+       + `<span class="cn-sep">·</span><span class="cn-tail">${ab}</span>`
+       + `<span class="cn-sep">·</span><span class="cn-desc">${desc}</span>`
+       + `<span class="cn-sep">·</span><span class="cn-tail">${cliente}</span>`
+       + `<span class="cn-sep">·</span><span class="cn-tail">${filial}</span>`;
+}
+
+/* ============== UPLOAD HANDLERS ============== */
+document.querySelectorAll('.upload input').forEach(inp=>{
+  inp.addEventListener('change',async e=>{
+    const file = e.target.files[0];
+    if(!file)return;
+    const target = e.target.dataset.target;
+    const lbl    = e.target.closest('.upload');
+    lbl.querySelector('.fname').textContent = '⏳ lendo...';
+    try{
+      const parsed = await readXLSX(file);
+      state[target] = parsed;
+      lbl.classList.add('ok');
+      lbl.querySelector('.fname').classList.remove('empty');
+      lbl.querySelector('.fname').textContent = file.name+' ('+parsed.rows.length+' CN)';
+      tryRender();
+    }catch(err){
+      lbl.querySelector('.fname').textContent = '❌ '+err.message;
+      alert(err.message);
+    }
+  });
+});
+
+/* ============== RENDER ============== */
+function tryRender(){
+  if(!state.curr) return;          // pelo menos a atual é obrigatória
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  loadOverrides();
+  loadCollapsedState();
+  loadHiddenCols();
+  buildFiltros();
+  bindVisivelToggle();
+  bindDrawer();
+  bindTableSort();
+  bindColumnsToggle();
+  bindCatSelect();
+  bindFluxoSelect();
+  updateOverrideBadge();
+  render();
+  initCollapsibles();
+  applyColumnVisibility();
+}
+
+function buildFiltros(){
+  const tipos = new Set();
+  state.curr.rows.forEach(r=>tipos.add(r.tipo));
+  const container = document.getElementById('filtros');
+  container.innerHTML = '';
+  const items = ['TODOS', ...TIPOS_ORDEM.filter(t=>tipos.has(t))];
+  items.forEach(t=>{
+    const c = document.createElement('span');
+    c.className = 'chip' + (state.filtros.includes(t)?' on':'');
+    c.textContent = t==='TODOS'?'Todos':TIPO_LABEL[t]||t;
+    c.dataset.tipo = t;
+    c.onclick = ()=>{
+      pushHistory('filtro de tipo');
+      if(t==='TODOS'){ state.filtros = ['TODOS']; }
+      else{
+        state.filtros = state.filtros.filter(x=>x!=='TODOS');
+        if(state.filtros.includes(t)) state.filtros = state.filtros.filter(x=>x!==t);
+        else state.filtros.push(t);
+        if(state.filtros.length===0) state.filtros=['TODOS'];
+      }
+      buildFiltros();
+      render();
+    };
+    container.appendChild(c);
+  });
+}
+
+function getFilteredRows(rows, applyVisivel=true){
+  let out = rows;
+  if(applyVisivel) out = out.filter(passaVisivel);
+  if(!state.filtros.includes('TODOS')) out = out.filter(r=>state.filtros.includes(r.tipo));
+  if(state.criterio) out = out.filter(passaCriterio);
+  return out;
+}
+
+function findPrev(cod){
+  if(!state.prev) return null;
+  return state.prev.rows.find(r=>r.cod===cod) || null;
+}
+
+function delta(now, before, isPct=false){
+  if(before==null) return {txt:'novo',cls:'flat'};
+  const d = now - before;
+  if(Math.abs(d) < (isPct?0.0005:0.5)) return {txt:'—',cls:'flat'};
+  const sign = d>0?'+':'−';
+  const cls = d>0 ? 'up' : 'down';
+  return {
+    txt: sign + (isPct ? Math.abs(d*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'pp'
+                       : fmtBRL(Math.abs(d)).replace('R$ ','R$ ')),
+    cls
+  };
+}
+
+function deltaArrow(now, before, isPct=false, invertGood=false){
+  // invertGood=true → quando o "good" é diminuir (ex.: custo realizado subindo é ruim)
+  // Para margem, subir é bom (default)
+  if(before==null) return '';
+  const d = now - before;
+  if(Math.abs(d) < (isPct?0.0005:0.5)) return '<span class="val-delta flat">— sem variação</span>';
+  const isUp = d>0;
+  const good = invertGood ? !isUp : isUp;
+  const cls = good ? 'up' : 'down';
+  const arrow = isUp ? '▲' : '▼';
+  const valStr = isPct ? Math.abs(d*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'pp'
+                       : fmtBRL(Math.abs(d));
+  return `<span class="val-delta ${cls}">${arrow} ${valStr}</span>`;
+}
+
+function render(){
+  const rows = getFilteredRows(state.curr.rows);
+  document.getElementById('metaObras').textContent = rows.length;
+  document.getElementById('metaTotal').textContent = state.curr.rows.length;
+  document.getElementById('metaPrev').textContent = state.prev ? state.prev.name : '—';
+  document.getElementById('metaCurr').textContent = state.curr.name;
+  renderCriterioChip();
+  renderHeroCards(rows);
+  renderTypeCards(rows);
+  renderCharts(rows);
+  renderCategorias(rows);
+  renderFluxo(rows);
+  renderTable(rows);
+}
+
+/* ============== FLUXO DE CAIXA — DESEMBOLSO × RECEBIMENTO ============== */
+const MESES_FLUXO = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+let _fluxoChart = null;
+
+function bindFluxoSelect(){
+  const sel = document.getElementById('fluxoCnSelect');
+  if(!sel || sel.dataset.bound) return;
+  sel.dataset.bound = '1';
+  sel.addEventListener('change', ()=>{ state.fluxoCN = sel.value; render(); });
+}
+
+function renderFluxo(rowsFiltered){
+  const sel    = document.getElementById('fluxoCnSelect');
+  const cv     = document.getElementById('chartFluxo');
+  const resumo = document.getElementById('fluxoResumo');
+  const anoEl  = document.getElementById('fluxoAno');
+  if(!cv || !resumo) return;
+
+  const fx = state.curr.fluxo;
+  if(!fx || !fx.temAbas || (!fx.despReal.size && !fx.despPrev.size)){
+    if(_fluxoChart){ _fluxoChart.destroy(); _fluxoChart = null; }
+    if(sel) sel.classList.add('hidden');
+    cv.parentElement.classList.add('hidden');
+    resumo.innerHTML = '<div class="cat-empty">Esta planilha não tem as abas <b>PREV. CUSTOS / IMP. DESPESAS</b> — fluxo de caixa indisponível.</div>';
+    return;
+  }
+  cv.parentElement.classList.remove('hidden');
+  if(anoEl) anoEl.textContent = fx.ano;
+
+  // ---- seletor de obra ----
+  if(state.fluxoCN && !rowsFiltered.some(r=>r.cod===state.fluxoCN)) state.fluxoCN = '';
+  if(sel){
+    sel.classList.remove('hidden');
+    const opcoes = rowsFiltered.slice().sort(compareCN);
+    sel.innerHTML = `<option value="">📊 Todas as obras da seleção (${rowsFiltered.length})</option>`
+      + opcoes.map(r=>`<option value="${r.cod}" ${r.cod===state.fluxoCN?'selected':''}>${r.cod} · ${descFromCN(r.cn)} · ${clienteFromCN(r.cn)}</option>`).join('');
+  }
+  const selRows = state.fluxoCN ? rowsFiltered.filter(r=>r.cod===state.fluxoCN) : rowsFiltered;
+  const cods = codsEfetivosSel(selRows);
+
+  const somaMes = (map)=>{
+    const a = new Array(12).fill(0);
+    map.forEach((arr,cod)=>{ if(cods.has(cod)) arr.forEach((v,i)=>a[i]+=v); });
+    return a;
+  };
+  const dR = somaMes(fx.despReal), dP = somaMes(fx.despPrev);
+  const rR = somaMes(fx.recReal),  rP = somaMes(fx.recPrev);
+
+  // ---- chips de seleção de séries ----
+  const vis = state.fluxoSeries;
+  const chipsEl = document.getElementById('fluxoChips');
+  if(chipsEl){
+    const CHIPS = [
+      {k:'dr',    rot:'💸 Gasto Real',           cor:'#fb923c'},
+      {k:'dp',    rot:'💸 Gasto Previsto',       cor:'rgba(251,146,60,.45)'},
+      {k:'rr',    rot:'💵 Faturado Real',        cor:'#4ade80'},
+      {k:'rp',    rot:'💵 Faturamento Previsto', cor:'rgba(74,222,128,.45)'},
+      {k:'saldo', rot:'— Saldo acumulado',       cor:'#00d4ff'},
+    ];
+    chipsEl.innerHTML = CHIPS.map(c=>
+      `<span class="fluxo-chip ${vis[c.k]?'on':''}" data-serie="${c.k}"><span class="fc-dot" style="background:${c.cor}"></span>${c.rot}</span>`
+    ).join('');
+    chipsEl.querySelectorAll('.fluxo-chip').forEach(ch=>{
+      ch.onclick = ()=>{ const k = ch.dataset.serie; state.fluxoSeries[k] = !state.fluxoSeries[k]; render(); };
+    });
+  }
+
+  // ---- saldo acumulado RECALCULADO pela seleção ----
+  // Com Real E Previsto ligados: melhor estimativa do mês = max(real, previsto).
+  // Meses fechados têm previsto zerado (ajuste mensal da engenharia) → vale o real;
+  // meses futuros têm real parcial (parcelas já agendadas) → vale o previsto;
+  // real que estourou o previsto → vale o real (mais honesto).
+  // Só Real → curva do realizado. Só Previsto → curva da projeção.
+  const combina = (real, prev, vReal, vPrev)=>real.map((v,i)=>{
+    if(vReal && vPrev) return Math.max(v, prev[i]);
+    if(vReal) return v;
+    if(vPrev) return prev[i];
+    return 0;
+  });
+  const efD = combina(dR, dP, vis.dr, vis.dp);
+  const efR = combina(rR, rP, vis.rr, vis.rp);
+  const saldo = []; let acc = 0;
+  for(let i=0;i<12;i++){ acc += efR[i]-efD[i]; saldo.push(acc); }
+  const rotSaldo = 'Saldo acumulado ('
+    + [(vis.dr||vis.rr)?'real':null, (vis.dp||vis.rp)?'previsto':null].filter(Boolean).join(' + ') + ')';
+
+  // ---- gráfico (séries desligadas ficam hidden) ----
+  const css = getComputedStyle(document.documentElement);
+  const MUT = css.getPropertyValue('--muted').trim()||'#8b9aaf';
+  const BRD = css.getPropertyValue('--border').trim()||'#1e3a5f';
+  if(_fluxoChart) _fluxoChart.destroy();
+  _fluxoChart = new Chart(cv, {
+    data: {
+      labels: MESES_FLUXO,
+      datasets: [
+        {type:'bar', label:'Desembolso Real',      data:dR, hidden:!vis.dr, backgroundColor:'#fb923c', stack:'d', order:2},
+        {type:'bar', label:'Desembolso Previsto',  data:dP, hidden:!vis.dp, backgroundColor:'rgba(251,146,60,.30)', borderColor:'#fb923c', borderWidth:1, stack:'dp', order:2},
+        {type:'bar', label:'Recebimento Real',     data:rR, hidden:!vis.rr, backgroundColor:'#4ade80', stack:'r', order:2},
+        {type:'bar', label:'Recebimento Previsto', data:rP, hidden:!vis.rp, backgroundColor:'rgba(74,222,128,.30)', borderColor:'#4ade80', borderWidth:1, stack:'rp', order:2},
+        {type:'line', label:rotSaldo, data:saldo, hidden:!vis.saldo, borderColor:'#00d4ff',
+         backgroundColor:'#00d4ff', tension:.3, pointRadius:3, borderWidth:2, order:1},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:MUT, font:{size:11}}},
+        y:{grid:{color:BRD}, ticks:{color:MUT, font:{size:10}, callback:v=>fmtBRL(v)}},
+      },
+      plugins:{
+        legend:{display:false},   // seleção pelos chips acima (única fonte de verdade)
+        tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${fmtBRLfull(ctx.parsed.y)}`}},
+      }
+    }
+  });
+
+  // ---- tabela mensal compacta (só as séries selecionadas) ----
+  const linha = (nome, arr, cls)=>`<tr class="${cls||''}"><td class="fl-nome">${nome}</td>${arr.map(v=>`<td>${v?fmtBRL(v):'<span class="fl-zero">—</span>'}</td>`).join('')}<td class="fl-tot">${fmtBRL(arr.reduce((a,b)=>a+b,0))}</td></tr>`;
+  const saldoMes = efR.map((v,i)=>v-efD[i]);
+  resumo.innerHTML = `
+    ${!fx.temPrevReceitas ? '<div class="fluxo-aviso">⚠ Aba <b>PREV. RECEITAS</b> ainda não preenchida na planilha — recebimento previsto zerado. Preencha para completar a projeção de caixa.</div>' : ''}
+    <div class="fluxo-scroll"><table class="fluxo-table">
+      <thead><tr><th></th>${MESES_FLUXO.map(m=>`<th>${m}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody>
+        ${vis.dr ? linha('💸 Desembolso Real', dR, 'fl-dr') : ''}
+        ${vis.dp ? linha('💸 Desembolso Previsto', dP, 'fl-dp') : ''}
+        ${vis.rr ? linha('💵 Recebimento Real', rR, 'fl-rr') : ''}
+        ${vis.rp ? linha('💵 Recebimento Previsto', rP, 'fl-rp') : ''}
+        ${vis.saldo ? `<tr class="fl-saldo"><td class="fl-nome">Saldo do mês</td>${saldoMes.map(v=>`<td class="${v<0?'neg':'pos'}">${v?fmtBRL(v):'—'}</td>`).join('')}<td class="fl-tot ${saldoMes.reduce((a,b)=>a+b,0)<0?'neg':'pos'}">${fmtBRL(saldoMes.reduce((a,b)=>a+b,0))}</td></tr>
+        <tr class="fl-saldo"><td class="fl-nome">${rotSaldo}</td>${saldo.map(v=>`<td class="${v<0?'neg':'pos'}">${fmtBRL(v)}</td>`).join('')}<td></td></tr>` : ''}
+      </tbody>
+    </table></div>`;
+}
+
+/* ============== ANÁLISE POR CATEGORIA (CURVA ABC) ============== */
+function aggCategoriasRows(rowsSel){
+  // Soma cats das obras selecionadas, evitando dupla contagem quando um CN
+  // consolidado (XFT, 73...) e seus componentes (93, 120...) estão ambos na seleção.
+  const selCods = new Set(rowsSel.map(r=>r.cod));
+  const consolidados = new Set();
+  rowsSel.forEach(r=>(r.catComps||[]).forEach(c=>{ if(selCods.has(c)) consolidados.add(c); }));
+  const tot = new Map();
+  rowsSel.forEach(r=>{
+    if(consolidados.has(r.cod) || !r.cats) return;
+    r.cats.forEach((v,c)=>tot.set(c,(tot.get(c)||0)+v));
+  });
+  return tot;
+}
+
+function bindCatSelect(){
+  const sel = document.getElementById('catCnSelect');
+  if(!sel || sel.dataset.bound) return;
+  sel.dataset.bound = '1';
+  sel.addEventListener('change', ()=>{ state.catCN = sel.value; render(); });
+}
+
+function codsEfetivosSel(rowsSel){
+  // Cods cujos lançamentos entram no agregado: obras selecionadas (com dedupe
+  // consolidado × componente) + componentes das consolidadas (XFT→93..., 73→120)
+  const selCods = new Set(rowsSel.map(r=>r.cod));
+  const consolidados = new Set();
+  rowsSel.forEach(r=>(r.catComps||[]).forEach(c=>{ if(selCods.has(c)) consolidados.add(c); }));
+  const out = new Set();
+  rowsSel.forEach(r=>{
+    if(consolidados.has(r.cod)) return;
+    out.add(r.cod);
+    (r.catComps||[]).forEach(c=>out.add(c));
+  });
+  return out;
+}
+
+function lancsDe(lancList, cods, cats){
+  // cats: null (todas) | Set de categorias
+  if(!lancList) return [];
+  return lancList.filter(l=>cods.has(l.cod) && (!cats || cats.has(l.cat)));
+}
+
+function diffLancs(codsSet, catsSet){
+  // Compara lançamentos curr vs prev (multiset por cod+competência+valor+descrição)
+  // → {novos:[], saidos:[]} — o que entrou e o que saiu/foi estornado na semana
+  const cur = lancsDe(state.curr.lanc, codsSet, catsSet);
+  const prv = lancsDe(state.prev ? state.prev.lanc : null, codsSet, catsSet);
+  const key = l => l.cod+'|'+l.cat+'|'+(l.comp?l.comp.getTime():'')+'|'+l.v.toFixed(2)+'|'+l.desc;
+  const cnt = new Map();
+  prv.forEach(l=>{ const k=key(l); cnt.set(k,(cnt.get(k)||0)+1); });
+  const novos = [];
+  cur.forEach(l=>{ const k=key(l); const c=cnt.get(k)||0; if(c>0) cnt.set(k,c-1); else novos.push(l); });
+  const cnt2 = new Map();
+  cur.forEach(l=>{ const k=key(l); cnt2.set(k,(cnt2.get(k)||0)+1); });
+  const saidos = [];
+  prv.forEach(l=>{ const k=key(l); const c=cnt2.get(k)||0; if(c>0) cnt2.set(k,c-1); else saidos.push(l); });
+  return {novos, saidos};
+}
+
+const escHtml = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtDataBR = d => d ? d.toLocaleDateString('pt-BR') : '—';
+
+/* ---- navegação dentro do painel de lançamentos: busca + sort + paginação ---- */
+let _detCtx = null;   // {cods:Set, cats:Set|null} — contexto do drill aberto (recalculado a cada render)
+
+const _normTxt = s => String(s??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function lancMatch(l, q){
+  if(!q) return true;
+  const alvo = _normTxt(l.desc+' '+l.cod+' '+l.cat+' '+l.conta+' '+fmtDataBR(l.comp));
+  return q.split(/\s+/).filter(Boolean).every(t=>alvo.includes(_normTxt(t))); // todos os termos (E)
+}
+
+function sortLancs(lista, sort){
+  const {col, dir} = sort;
+  const m = dir==='asc' ? 1 : -1;
+  return lista.slice().sort((a,b)=>{
+    let r = 0;
+    if(col==='v') r = a.v-b.v;
+    else if(col==='comp') r = (a.comp?a.comp.getTime():0)-(b.comp?b.comp.getTime():0);
+    else if(col==='cod'){
+      const ka=codeSortKey(a.cod), kb=codeSortKey(b.cod);
+      r = ka[0]!==kb[0] ? ka[0]-kb[0] : (ka[0]===0 ? ka[1]-kb[1] : ka[2].localeCompare(kb[2]));
+    }
+    else r = String(a.desc).localeCompare(String(b.desc),'pt-BR');
+    return r*m || (b.v-a.v);   // desempate: maior valor primeiro
+  });
+}
+
+function lancTableHTML(lista, det){
+  const q     = det.search||'';
+  const filt  = q ? lista.filter(l=>lancMatch(l,q)) : lista;
+  const orden = sortLancs(filt, det.sort);
+  const corte = orden.slice(0, det.limit);
+  const somaF = filt.reduce((a,l)=>a+l.v,0);
+  const arrow = c => det.sort.col===c ? (det.sort.dir==='desc'?' ▼':' ▲') : '';
+  if(!filt.length) return `<div class="lanc-none">nenhum lançamento${q?' com o filtro "'+escHtml(q)+'"':''}</div>`;
+  return `
+    <div class="scrollbox"><table>
+      <thead><tr>
+        <th class="lsort" data-lsort="comp" title="Ordenar por data">Competência${arrow('comp')}</th>
+        <th class="lsort" data-lsort="cod" title="Ordenar por CN">CN${arrow('cod')}</th>
+        <th class="lsort" data-lsort="desc" title="Ordenar por descrição">Descrição${arrow('desc')}</th>
+        <th class="lsort" style="text-align:right" data-lsort="v" title="Ordenar por valor">Valor${arrow('v')}</th>
+      </tr></thead>
+      <tbody>
+        ${corte.map(l=>`<tr>
+          <td style="white-space:nowrap">${fmtDataBR(l.comp)}</td>
+          <td class="cod">${escHtml(l.cod)}</td>
+          <td class="desc" title="${escHtml(l.desc)}${l.conta?' · '+escHtml(l.conta):''}${l.cat?' · '+escHtml(l.cat):''}">${escHtml(l.desc)||'—'}</td>
+          <td class="val">${fmtBRLfull(l.v)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+    ${orden.length>corte.length ? `<button class="lanc-more-btn" data-lanc-more="1">▾ mostrar mais ${Math.min(250, orden.length-corte.length)} (${orden.length-corte.length} restantes)</button>` : ''}
+    <div class="lanc-sum"><b>${filt.length}</b>${q&&filt.length!==lista.length?` de ${lista.length}`:''} lançamento(s) · <b>${fmtBRLfull(somaF)}</b>${q?' <span style="color:var(--cyan)">(filtro ativo)</span>':''}</div>`;
+}
+
+function lancBodyHTML(){
+  const det = state.catDetail;
+  if(!det || !_detCtx) return '';
+  if(det.mode==='lanc'){
+    const lista = lancsDe(state.curr.lanc, _detCtx.cods, _detCtx.cats);
+    return lista.length ? lancTableHTML(lista, det) : '<div class="cat-empty">Sem lançamentos.</div>';
+  }
+  const {novos, saidos} = diffLancs(_detCtx.cods, _detCtx.cats);
+  const sN = novos.reduce((a,l)=>a+l.v,0), sS = saidos.reduce((a,l)=>a+l.v,0);
+  return `
+    <div class="dl-group"><div class="dl-title up">▲ Novos lançamentos (${novos.length}) · ${fmtBRLfull(sN)}</div>
+      ${novos.length ? lancTableHTML(novos, det) : '<div class="lanc-none">nenhum</div>'}
+    </div>
+    ${saidos.length ? `<div class="dl-group"><div class="dl-title down">▼ Saíram / estornados / reclassificados (${saidos.length}) · ${fmtBRLfull(sS)}</div>
+      ${lancTableHTML(saidos, det)}
+    </div>` : ''}`;
+}
+
+function wireLancBody(){
+  const holder = document.querySelector('#catBody .lanc-body');
+  if(!holder) return;
+  holder.querySelectorAll('.lsort').forEach(th=>{
+    th.onclick = ()=>{
+      const c = th.dataset.lsort;
+      const s = state.catDetail.sort;
+      if(s.col===c) s.dir = s.dir==='desc' ? 'asc' : 'desc';
+      else { s.col = c; s.dir = (c==='desc'||c==='cod') ? 'asc' : 'desc'; }
+      refreshLancBody();
+    };
+  });
+  holder.querySelectorAll('[data-lanc-more]').forEach(b=>{
+    b.onclick = ()=>{ state.catDetail.limit += 250; refreshLancBody(); };
+  });
+}
+
+function refreshLancBody(){
+  const holder = document.querySelector('#catBody .lanc-body');
+  if(!holder) return;
+  holder.innerHTML = lancBodyHTML();
+  wireLancBody();
+}
+
+function catDetailHTML(titulo, codsSet, catsSet, mode){
+  _detCtx = {cods: codsSet, cats: catsSet};
+  const det = state.catDetail;
+  let headExtra = '';
+  if(mode==='delta'){
+    const {novos, saidos} = diffLancs(codsSet, catsSet);
+    const net = novos.reduce((a,l)=>a+l.v,0) - saidos.reduce((a,l)=>a+l.v,0);
+    headExtra = `<span class="dl-net ${net>0?'up':net<0?'down':'flat'}">${net>0?'▲':net<0?'▼':'—'} ${fmtBRLfull(Math.abs(net))} líquido</span>`;
+  }
+  return `<div class="cat-detail">
+    <div class="cat-detail-head">${mode==='lanc'?'🔍 Lançamentos':'Δ na semana'} — <b>${escHtml(titulo)}</b>
+      ${headExtra}
+      <input type="text" class="lanc-search" placeholder="🔍 buscar descrição, CN, conta, data..." value="${escHtml(det.search||'')}">
+      <span class="cat-detail-close" data-cat-close="1">✕ fechar</span>
+    </div>
+    <div class="lanc-body">${lancBodyHTML()}</div>
+  </div>`;
+}
+
+function renderCategorias(rowsFiltered){
+  const sel  = document.getElementById('catCnSelect');
+  const body = document.getElementById('catBody');
+  if(!sel || !body) return;
+
+  const temCats = state.curr.rows.some(r=>r.cats && r.cats.size);
+  if(!temCats){
+    sel.classList.add('hidden');
+    if(_paretoChart){ _paretoChart.destroy(); _paretoChart = null; }
+    body.innerHTML = '<div class="cat-empty">Esta planilha não tem a aba <b>IMP. DESPESAS</b> — análise por categoria indisponível.</div>';
+    return;
+  }
+  sel.classList.remove('hidden');
+
+  // ---- seletor de obra (drill por CN) ----
+  if(state.catCN && !rowsFiltered.some(r=>r.cod===state.catCN)) state.catCN = '';
+  const opcoes = rowsFiltered.slice().sort(compareCN);
+  sel.innerHTML = `<option value="">📊 Todas as obras da seleção (${rowsFiltered.length})</option>`
+    + opcoes.map(r=>`<option value="${r.cod}" ${r.cod===state.catCN?'selected':''}>${r.cod} · ${descFromCN(r.cn)} · ${clienteFromCN(r.cn)}</option>`).join('');
+
+  const selRows = state.catCN ? rowsFiltered.filter(r=>r.cod===state.catCN) : rowsFiltered;
+  const tot = aggCategoriasRows(selRows);
+  const soma = [...tot.values()].reduce((a,b)=>a+b,0);
+  if(!soma){
+    if(_paretoChart){ _paretoChart.destroy(); _paretoChart = null; }
+    body.innerHTML = '<div class="cat-empty">Sem lançamentos de despesa para a seleção atual.</div>';
+    return;
+  }
+  const codsSel = codsEfetivosSel(selRows);
+
+  // ---- semana anterior (apple-to-apple: mesmos códigos) ----
+  let prevTot = null;
+  if(state.prev){
+    const selCods = new Set(selRows.map(r=>r.cod));
+    const prevRows = state.prev.rows.filter(r=>selCods.has(r.cod));
+    if(prevRows.some(r=>r.cats && r.cats.size)) prevTot = aggCategoriasRows(prevRows);
+  }
+  const temDiff = !!(prevTot && state.prev && state.prev.lanc);
+
+  // ---- ranking + classe ABC (sobre TODAS as categorias, antes do corte) ----
+  const rank = [...tot.entries()].sort((a,b)=>b[1]-a[1]);
+  let acum = 0;
+  const linhas = rank.map(([cat,v])=>{
+    acum += v;
+    const pAcum = acum/soma;
+    return {cat, v, pct:v/soma, pAcum, abc: pAcum<=0.80 ? 'A' : (pAcum<=0.95 ? 'B' : 'C')};
+  });
+  const TOP = 12;
+  const top    = linhas.slice(0,TOP);
+  const resto  = linhas.slice(TOP);
+  const somaResto = resto.reduce((a,l)=>a+l.v,0);
+  const maxV = top.length ? top[0].v : 1;
+  const nA = linhas.filter(l=>l.abc==='A').length,
+        nB = linhas.filter(l=>l.abc==='B').length,
+        nC = linhas.filter(l=>l.abc==='C').length;
+
+  // sanity do drill aberto: categoria sumiu da seleção → fecha
+  if(state.catDetail && state.catDetail.cat!=='__TOTAL__' && state.catDetail.cat!=='__DEMAIS__' && !tot.has(state.catDetail.cat)) state.catDetail = null;
+  if(!resto.length) state.catDemaisOpen = false;
+  const det = state.catDetail;
+
+  const deltaCat = (cat, v)=>{
+    if(!prevTot) return '<span class="cat-delta flat">—</span>';
+    const antes = prevTot.get(cat)||0;
+    const d = v - antes;
+    if(Math.abs(d) < 0.5) return '<span class="cat-delta flat">— s/ var.</span>';
+    const cls = d>0?'up':'down';
+    const click = temDiff ? ` cat-delta-click" data-cat-delta="${escHtml(cat)}" title="Clique para ver os lançamentos que explicam a variação` : '';
+    return `<span class="cat-delta ${cls}${click}">${d>0?'▲':'▼'} ${fmtBRL(Math.abs(d))}</span>`;
+  };
+
+  const detailFor = (cat)=>{
+    if(!det || det.cat!==cat) return '';
+    const cs = new Set([cat]);
+    return catDetailHTML(cat, codsSel, cs, det.mode);
+  };
+
+  const linhaHTML = (l,i,sub)=>`
+    <div class="cat-row${sub?' cat-sub':''}" data-cat="${escHtml(l.cat)}" title="Clique para ver os lançamentos">
+      <span class="cat-rank">${sub?'·':i+1}</span>
+      <span class="cat-name"><span class="cat-abc ${l.abc}">${l.abc}</span>${escHtml(l.cat)}</span>
+      <span class="cat-bar-wrap"><span class="cat-bar" style="width:${(l.v/maxV*100).toFixed(1)}%"></span></span>
+      <span class="cat-val" title="${fmtBRLfull(l.v)}">${fmtBRL(l.v)}</span>
+      <span class="cat-pct">${(l.pct*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}%</span>
+      <span class="cat-acum">${(l.pAcum*100).toLocaleString('pt-BR',{maximumFractionDigits:0})}%</span>
+      ${deltaCat(l.cat,l.v)}
+    </div>${detailFor(l.cat)}`;
+
+  // delta do "Demais": compara com as MESMAS categorias do resto na semana anterior
+  const catsResto = new Set(resto.map(l=>l.cat));
+  let deltaResto = '<span class="cat-delta flat">—</span>';
+  if(prevTot && resto.length){
+    const antesResto = resto.reduce((a,l)=>a+(prevTot.get(l.cat)||0),0);
+    const d = somaResto - antesResto;
+    deltaResto = Math.abs(d)<0.5 ? '<span class="cat-delta flat">— s/ var.</span>'
+      : `<span class="cat-delta ${d>0?'up':'down'}${temDiff?' cat-delta-click" data-cat-delta="__DEMAIS__" title="Clique para ver o que mudou':''}">${d>0?'▲':'▼'} ${fmtBRL(Math.abs(d))}</span>`;
+  }
+
+  let deltaTotal = '<span class="cat-delta flat">—</span>';
+  if(prevTot){
+    const somaPrev = [...prevTot.values()].reduce((a,b)=>a+b,0);
+    const d = soma - somaPrev;
+    deltaTotal = Math.abs(d)<0.5 ? '<span class="cat-delta flat">— s/ var.</span>'
+      : `<span class="cat-delta ${d>0?'up':'down'}${temDiff?' cat-delta-click" data-cat-delta="__TOTAL__" title="Clique para ver todos os lançamentos que mudaram na semana':''}">${d>0?'▲':'▼'} ${fmtBRL(Math.abs(d))} na semana</span>`;
+  }
+
+  // Detalhe do Demais/Total
+  const demaisDetail = (det && det.cat==='__DEMAIS__') ? catDetailHTML(`Demais (${resto.length} categorias)`, codsSel, catsResto, det.mode) : '';
+  const totalDetail  = (det && det.cat==='__TOTAL__')  ? catDetailHTML('TOTAL — todas as categorias', codsSel, null, det.mode) : '';
+
+  body.innerHTML = `
+    <div class="cat-cols"><span>#</span><span>Categoria</span><span></span><span>Valor</span><span>%</span><span>Acum.</span><span>Δ vs anterior</span></div>
+    <div class="cat-list">
+      ${top.map((l,i)=>linhaHTML(l,i,false)).join('')}
+      ${resto.length ? `
+      <div class="cat-row demais" data-demais="1" title="Clique para ${state.catDemaisOpen?'recolher':'abrir'} as categorias da cauda">
+        <span class="cat-rank">${state.catDemaisOpen?'▾':'▸'}</span>
+        <span class="cat-name">Demais (${resto.length} categorias)</span>
+        <span class="cat-bar-wrap"><span class="cat-bar" style="width:${(somaResto/maxV*100).toFixed(1)}%"></span></span>
+        <span class="cat-val" title="${fmtBRLfull(somaResto)}">${fmtBRL(somaResto)}</span>
+        <span class="cat-pct">${(somaResto/soma*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}%</span>
+        <span class="cat-acum">100%</span>
+        ${deltaResto}
+      </div>
+      ${demaisDetail}
+      ${state.catDemaisOpen ? resto.map((l,i)=>linhaHTML(l,i,true)).join('') : ''}` : ''}
+    </div>
+    <div class="cat-total">
+      <span></span><span>TOTAL (custo sem impostos)</span><span></span>
+      <span class="cat-val" title="${fmtBRLfull(soma)}">${fmtBRL(soma)}</span>
+      <span class="cat-pct">100%</span><span></span>
+      ${deltaTotal}
+    </div>
+    ${totalDetail}
+    <div class="cat-foot">
+      <span><b>Curva ABC:</b></span>
+      <span><span class="cat-abc A">A</span> até 80% do gasto · <b>${nA}</b> categoria(s)</span>
+      <span><span class="cat-abc B">B</span> 80–95% · <b>${nB}</b></span>
+      <span><span class="cat-abc C">C</span> cauda final · <b>${nC}</b></span>
+      <span style="margin-left:auto">${state.prev ? '💡 clique na <b>categoria</b> = lançamentos · clique no <b>Δ</b> = o que mudou' : 'Carregue a <b>semana anterior</b> para ver os deltas'}</span>
+    </div>
+    <div class="pareto-block">
+      <div class="pareto-title">📉 Diagrama de Pareto — concentração do gasto <span class="comp-sub">barras = maiores categorias (cor da classe ABC) · linha = % acumulado · toque numa barra para abrir os lançamentos</span></div>
+      <div class="pareto-wrap"><canvas id="chartPareto"></canvas></div>
+    </div>`;
+
+  // ---- interações (após innerHTML) ----
+  body.querySelectorAll('.cat-row[data-cat]').forEach(el=>{
+    el.onclick = (e)=>{
+      if(e.target.closest('.cat-delta-click')) return;   // delta tem handler próprio
+      const cat = el.dataset.cat;
+      state.catDetail = (det && det.cat===cat && det.mode==='lanc') ? null : {cat, mode:'lanc', search:'', sort:{col:'v',dir:'desc'}, limit:250};
+      render();
+    };
+  });
+  body.querySelectorAll('.cat-delta-click').forEach(el=>{
+    el.onclick = (e)=>{
+      e.stopPropagation();
+      const cat = el.dataset.catDelta;
+      state.catDetail = (det && det.cat===cat && det.mode==='delta') ? null : {cat, mode:'delta', search:'', sort:{col:'v',dir:'desc'}, limit:250};
+      render();
+    };
+  });
+  const demaisRow = body.querySelector('.cat-row[data-demais]');
+  if(demaisRow) demaisRow.onclick = (e)=>{
+    if(e.target.closest('.cat-delta-click')) return;
+    state.catDemaisOpen = !state.catDemaisOpen;
+    render();
+  };
+  body.querySelectorAll('[data-cat-close]').forEach(el=>{
+    el.onclick = (e)=>{ e.stopPropagation(); state.catDetail = null; render(); };
+  });
+  // busca dentro do painel: atualiza SÓ o corpo da tabela (mantém o foco no input)
+  const si = body.querySelector('.lanc-search');
+  if(si){
+    si.oninput = ()=>{
+      if(!state.catDetail) return;
+      state.catDetail.search = si.value;
+      state.catDetail.limit  = 250;
+      refreshLancBody();
+    };
+  }
+  wireLancBody();
+  renderPareto(linhas);
+}
+
+/* ============== DIAGRAMA DE PARETO (dentro da Análise por Categoria) ============== */
+let _paretoChart = null;
+function renderPareto(linhas){
+  const cv = document.getElementById('chartPareto');
+  if(!cv){ if(_paretoChart){ _paretoChart.destroy(); _paretoChart = null; } return; }
+  const PN  = Math.min(15, linhas.length);
+  const top = linhas.slice(0, PN);
+  const CORES = {A:'#00d4ff', B:'#fde047', C:'#8b9aaf'};
+  const ALFA  = {A:'cc', B:'b3', C:'55'};
+  const css = getComputedStyle(document.documentElement);
+  const MUT = css.getPropertyValue('--muted').trim()||'#8b9aaf';
+  const BRD = css.getPropertyValue('--border').trim()||'#1e3a5f';
+  if(_paretoChart) _paretoChart.destroy();
+  _paretoChart = new Chart(cv, {
+    data:{
+      labels: top.map(l=>l.cat.length>16 ? l.cat.slice(0,15)+'…' : l.cat),
+      datasets:[
+        {type:'bar', label:'Gasto', data:top.map(l=>l.v),
+         backgroundColor:top.map(l=>CORES[l.abc]+ALFA[l.abc]),
+         borderColor:top.map(l=>CORES[l.abc]), borderWidth:1, yAxisID:'y', order:3},
+        {type:'line', label:'% acumulado', data:top.map(l=>+(l.pAcum*100).toFixed(1)),
+         borderColor:'#00d4ff', backgroundColor:'#00d4ff', yAxisID:'y1',
+         tension:.25, pointRadius:3, borderWidth:2, order:1},
+        {type:'line', label:'Corte A (80%)', data:new Array(PN).fill(80),
+         borderColor:'rgba(0,212,255,.35)', borderDash:[6,4], pointRadius:0, borderWidth:1, yAxisID:'y1', order:2},
+        {type:'line', label:'Corte B (95%)', data:new Array(PN).fill(95),
+         borderColor:'rgba(253,224,71,.35)', borderDash:[6,4], pointRadius:0, borderWidth:1, yAxisID:'y1', order:2},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      onClick:(e, els2)=>{
+        if(!els2.length) return;
+        const l = top[els2[0].index];
+        if(!l) return;
+        const det = state.catDetail;
+        state.catDetail = (det && det.cat===l.cat && det.mode==='lanc')
+          ? null
+          : {cat:l.cat, mode:'lanc', search:'', sort:{col:'v',dir:'desc'}, limit:250};
+        if(state.catDetail && linhas.indexOf(l) >= 12) state.catDemaisOpen = true; // categoria da cauda: abre o "Demais" p/ mostrar o painel
+        render();
+      },
+      scales:{
+        x:{grid:{display:false}, ticks:{color:MUT, font:{size:9}, maxRotation:60, minRotation:40, autoSkip:false}},
+        y:{grid:{color:BRD}, ticks:{color:MUT, font:{size:9}, callback:v=>fmtBRL(v)}},
+        y1:{position:'right', min:0, max:100, grid:{display:false}, ticks:{color:MUT, font:{size:9}, callback:v=>v+'%'}},
+      },
+      plugins:{
+        legend:{labels:{color:MUT, font:{size:10}, boxWidth:12, filter:it=>!String(it.text).startsWith('Corte')}},
+        tooltip:{
+          filter: item=>!String(item.dataset.label).startsWith('Corte'),
+          callbacks:{
+            title: items=>items.length ? top[items[0].dataIndex].cat : '',
+            label: ctx=>{
+              const l = top[ctx.dataIndex];
+              if(ctx.dataset.label==='Gasto')
+                return ` ${fmtBRLfull(l.v)} · ${(l.pct*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% do total · classe ${l.abc}`;
+              return ` acumulado: ${(l.pAcum*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ============== CHIP DE CRITÉRIO ATIVO ============== */
+function renderCriterioChip(){
+  const chip = document.getElementById('criterioChip');
+  if(!chip) return;
+  if(!state.criterio){
+    chip.classList.add('hidden');
+    chip.innerHTML = '';
+    return;
+  }
+  const def = CRITERIOS[state.criterio];
+  if(!def){ chip.classList.add('hidden'); return; }
+  chip.classList.remove('hidden');
+  chip.innerHTML = `
+    <span class="crit-icon">${def.icon}</span>
+    <span class="crit-label">${def.label}</span>
+    <button class="crit-clear" title="Remover este filtro de critério">×</button>`;
+  chip.querySelector('.crit-clear').onclick = clearCriterio;
+}
+
+/* ============== PONTOS DE ATENÇÃO ============== */
+function classifyAlerta(r){
+  // Ignora obras sem materialidade (sem proposta = não classificável)
+  if(!(r.proposta > 0)) return null;
+  // retorna {prioridade:1-3, tag, acao, motivo, classe} ou null se não é alerta
+  const margem = r.margemAtu;
+  const avanco = r.orcado>0 ? r.realizado/r.orcado : 0;
+  // P1 — PREJUÍZO (margem negativa)
+  if(margem < 0){
+    return {prio:1, tag:'🔴', acao:'REVISAR ORÇAMENTO', motivo:`Margem ${(margem*100).toFixed(1)}% · em prejuízo`, classe:'urgente'};
+  }
+  // P2 — ESTOURO (avanço > 100%, qualquer margem)
+  if(avanco > 1.0){
+    return {prio:2, tag:'🔴', acao:'NEGOCIAR ADITIVO',
+            motivo:`Estourou orçado em ${((avanco-1)*100).toFixed(0)}% · margem ${(margem*100).toFixed(1)}%`, classe:'urgente'};
+  }
+  // P3 — MARGEM CRÍTICA (entre 0 e 15%)
+  if(margem >= 0 && margem < 0.15){
+    return {prio:3, tag:'🟠', acao:'MONITORAR CUSTOS',
+            motivo:`Margem ${(margem*100).toFixed(1)}% · zona crítica`, classe:'alta'};
+  }
+  // P4 — ABAIXO DA META FORTE (15-20%)
+  if(margem >= 0.15 && margem < 0.20){
+    return {prio:4, tag:'🟡', acao:'REVISAR PLANO',
+            motivo:`Margem ${(margem*100).toFixed(1)}% · longe da meta de 30%`, classe:'media'};
+  }
+  return null;
+}
+
+function renderAlertas(rows){
+  const sec = document.getElementById('alertasSection');
+  const alertas = rows
+    .map(r=>({r, a:classifyAlerta(r)}))
+    .filter(x=>x.a)
+    .sort((x,y)=>{
+      if(x.a.prio!==y.a.prio) return x.a.prio - y.a.prio;
+      return (y.r.proposta||0) - (x.r.proposta||0);  // dentro da mesma prio, maior proposta primeiro
+    })
+    .slice(0, 6);  // máximo 6 alertas
+
+  if(alertas.length===0){
+    sec.innerHTML = `
+      <div class="alertas-card empty">
+        <div class="alertas-header">
+          <div class="alertas-title"><span class="ico">✅</span>Pontos de Atenção</div>
+          <div class="alertas-count">Nenhuma obra em alerta no conjunto filtrado</div>
+        </div>
+        <div class="alertas-empty-msg">Todas as ${rows.length} obras visíveis estão acima de 20% de margem e dentro do orçado. Boa semana!</div>
+      </div>`;
+    return;
+  }
+  const items = alertas.map(({r, a})=>{
+    const partes = (r.cn||'').split(' - ');
+    const desc = partes.length>=4 ? partes.slice(2,-2).join(' - ') : (r.cn||'');
+    const cliente = partes.length>=4 ? partes[partes.length-2] : '';
+    const filial  = partes.length>=4 ? partes[partes.length-1] : '';
+    const metricColor = r.margemAtu<0 ? 'var(--red)' : r.margemAtu<0.15 ? 'var(--orange)' : 'var(--yellow)';
+    return `
+      <div class="alerta-item" data-cod="${r.cod}" title="Click para destacar na tabela">
+        <span class="a-icon">${a.tag}</span>
+        <span class="a-cod">${r.cod}</span>
+        <div class="a-info">
+          <div class="a-name">${desc}</div>
+          <div class="a-sub"><b>${cliente}</b> · ${filial} · proposta ${fmtBRL(r.proposta)}${r.resp?` · resp <b>${r.resp}</b>`:''}</div>
+        </div>
+        <span class="a-metric" style="color:${metricColor}">${a.motivo}</span>
+        <span class="a-action ${a.classe}">${a.acao}</span>
+      </div>`;
+  }).join('');
+  const totalCriticos = rows.filter(r=>{const a=classifyAlerta(r); return a && a.prio<=2;}).length;
+  sec.innerHTML = `
+    <div class="alertas-card">
+      <div class="alertas-header">
+        <div class="alertas-title"><span class="ico">⚠️</span>Pontos de Atenção · onde atacar agora</div>
+        <div class="alertas-count"><b>${alertas.length}</b> obra${alertas.length>1?'s':''} em alerta${totalCriticos>0?` · <b style="color:var(--red)">${totalCriticos}</b> precisa${totalCriticos>1?'m':''} de decisão imediata`:''}</div>
+      </div>
+      <div class="alertas-list">${items}</div>
+    </div>`;
+  // wire dos clicks para destacar na tabela
+  sec.querySelectorAll('.alerta-item').forEach(el=>{
+    el.onclick = ()=> highlightTableRow(el.dataset.cod);
+  });
+}
+
+function highlightTableRow(cod){
+  const tr = document.querySelector(`#tbody tr[data-cod="${cod}"]`);
+  if(!tr) return;
+  tr.scrollIntoView({behavior:'smooth', block:'center'});
+  tr.classList.add('flash-highlight');
+  setTimeout(()=>tr.classList.remove('flash-highlight'), 2000);
+}
+
+/* ============== NOVIDADES DA SEMANA ============== */
+/* Detecta obras que existem na semana atual mas NÃO existiam na semana anterior
+   (= novas obras aprovadas/cadastradas no período). Também lista removidas.
+   Compara o universo TOTAL (não respeita filtros) — novidade é fato independente da seleção. */
+function renderNovidades(){
+  const sec = document.getElementById('novidadesSection');
+  if(!state.prev){
+    sec.innerHTML = `
+      <div class="novidades-card empty">
+        <div class="novidades-header">
+          <div class="novidades-title"><span class="ico">🆕</span>Novidades da Semana</div>
+          <div class="novidades-meta">Carregue a planilha da semana anterior para comparar</div>
+        </div>
+        <div class="novidades-empty-msg">Sem comparação possível — só a semana atual está carregada.</div>
+      </div>`;
+    return;
+  }
+  const prevCods = new Set(state.prev.rows.map(r=>r.cod));
+  const currCods = new Set(state.curr.rows.map(r=>r.cod));
+  const novas = state.curr.rows.filter(r=>!prevCods.has(r.cod));
+  const removidas = state.prev.rows.filter(r=>!currCods.has(r.cod));
+
+  if(novas.length===0 && removidas.length===0){
+    sec.innerHTML = `
+      <div class="novidades-card empty">
+        <div class="novidades-header">
+          <div class="novidades-title"><span class="ico">🆕</span>Novidades da Semana</div>
+          <div class="novidades-meta">Comparação vs semana anterior</div>
+        </div>
+        <div class="novidades-empty-msg">✓ Mesmo conjunto de ${state.curr.rows.length} obras nas duas semanas — sem aprovações nem remoções.</div>
+      </div>`;
+    return;
+  }
+
+  // ordena novas por proposta (maiores primeiro = mais relevantes)
+  novas.sort((a,b)=>(b.proposta||0)-(a.proposta||0));
+
+  const totalProposta = novas.reduce((s,r)=>s+(r.proposta>0?r.proposta:0),0);
+  const itemsHtml = novas.map(r=>{
+    const partes = (r.cn||'').split(' - ');
+    const desc = partes.length>=4 ? partes.slice(2,-2).join(' - ') : (r.cn||'');
+    const cliente = partes.length>=4 ? partes[partes.length-2] : '';
+    const filial  = partes.length>=4 ? partes[partes.length-1] : '';
+    const tipoLabel = TIPO_LABEL[r.tipo] || r.tipo;
+    const margemPlan = r.margemOrig>0 ? `${(r.margemOrig*100).toFixed(0)}%` : '—';
+    const propStr = r.proposta>0 ? fmtBRL(r.proposta) : 'sem proposta';
+    return `
+      <div class="novidade-item" data-cod="${r.cod}" title="Click para destacar na tabela">
+        <span class="n-icon">⊕</span>
+        <span class="n-cod">${r.cod}</span>
+        <div class="n-info">
+          <div class="n-name">${desc}</div>
+          <div class="n-sub"><b>${cliente}</b> · ${filial} · <b>${tipoLabel}</b>${r.resp?` · resp <b>${r.resp}</b>`:''}</div>
+        </div>
+        <div class="n-metric">
+          <div class="n-prop">${propStr}</div>
+          <div class="n-margem">margem planejada ${margemPlan}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const removidasHtml = removidas.length>0
+    ? `<div class="novidades-removidas">↳ <b>${removidas.length} obra${removidas.length>1?'s':''} removida${removidas.length>1?'s':''} desde a semana anterior:</b> ${removidas.map(r=>r.cod).join(', ')}</div>`
+    : '';
+
+  sec.innerHTML = `
+    <div class="novidades-card">
+      <div class="novidades-header">
+        <div class="novidades-title"><span class="ico">🆕</span>Novidades da Semana · ${novas.length} obra${novas.length>1?'s':''} nova${novas.length>1?'s':''} aprovada${novas.length>1?'s':''}</div>
+        <div class="novidades-meta">${totalProposta>0?`Total <b>${fmtBRL(totalProposta)}</b> em propostas novas · `:''}vs ${state.prev.name||'semana anterior'}</div>
+      </div>
+      <div class="novidades-list">${itemsHtml}</div>
+      ${removidasHtml}
+    </div>`;
+
+  sec.querySelectorAll('.novidade-item').forEach(el=>{
+    el.onclick = ()=> highlightTableRow(el.dataset.cod);
+  });
+}
+
+/* ============== TOP ESTRELAS / TOP CRÍTICAS ============== */
+function renderTopObras(rows){
+  const sec = document.getElementById('topSection');
+  // só obras com materialidade financeira (proposta > 0)
+  const validRows = rows.filter(r=>r.proposta > 0);
+  if(validRows.length===0){ sec.innerHTML=''; return; }
+  // ordena por margem atual
+  const sortedDesc = [...validRows].sort((a,b)=>b.margemAtu - a.margemAtu);
+  const top3 = sortedDesc.slice(0, 3);
+  const bot3 = sortedDesc.slice(-3).reverse();
+
+  const buildRow = (r)=>{
+    const partes = (r.cn||'').split(' - ');
+    const desc = partes.length>=4 ? partes.slice(2,-2).join(' - ') : (r.cn||'');
+    const cliente = partes.length>=4 ? partes[partes.length-2] : '';
+    const filial  = partes.length>=4 ? partes[partes.length-1] : '';
+    const cls = r.margemAtu>=0.30 ? 'good' : r.margemAtu>=0.20 ? 'warn' : 'bad';
+    return `
+      <div class="top-row" data-cod="${r.cod}">
+        <span class="t-cod">${r.cod}</span>
+        <div class="t-info">
+          <span class="t-name">${desc}</span>
+          <span class="t-sub">${cliente} · ${filial}</span>
+        </div>
+        <span class="t-margem ${cls}">${(r.margemAtu*100).toFixed(1)}%</span>
+      </div>`;
+  };
+
+  sec.innerHTML = `
+    <div class="top-block estrelas">
+      <div class="top-block-title"><span>⭐</span>Top 3 Estrelas da semana</div>
+      ${top3.length ? top3.map(buildRow).join('') : '<div class="top-block-empty">Sem dados</div>'}
+    </div>
+    <div class="top-block criticas">
+      <div class="top-block-title"><span>🚨</span>Top 3 Críticas da semana</div>
+      ${bot3.length ? bot3.map(buildRow).join('') : '<div class="top-block-empty">Sem dados</div>'}
+    </div>`;
+  sec.querySelectorAll('.top-row').forEach(el=>{
+    el.onclick = ()=> highlightTableRow(el.dataset.cod);
+  });
+}
+
+/* ============== HERO KPI CARDS (estilo consolidado) ============== */
+
+/** Mini-gauge de arco preenchido (semicírculo) — barra de progresso radial.
+ *  A barra SEMPRE termina em 100% (= limite atingido). Valores acima de 100%
+ *  deixam a barra cheia e vermelha — "estourou o orçado" fica visualmente óbvio. */
+function renderArcGauge(value, opts={}){
+  let color = opts.color || '#4ade80';
+  const overLimit = value > 100;
+  if(opts.thresholdsHighBad){
+    // Avanço Fin / Simulado: verde≤75, amarelo≤90, laranja≤100, VERMELHO >100
+    if(overLimit)        color = '#ef4444';
+    else if(value > 90)  color = '#fb923c';
+    else if(value > 75)  color = '#fde047';
+    else                 color = '#4ade80';
+  } else if(opts.thresholdsHighGood){
+    // % Faturado: vermelho<25, laranja<50, amarelo<75, verde≥75
+    if(value < 25)       color = '#ef4444';
+    else if(value < 50)  color = '#fb923c';
+    else if(value < 75)  color = '#fde047';
+    else                 color = '#4ade80';
+  }
+  const cx=70, cy=68, r=52;
+  // Visual SEMPRE limitado a 100% — barra cheia = limite atingido.
+  // Se valor > 100, a barra fica cheia e fica em vermelho.
+  const visualPct = Math.max(0, Math.min(1, value/100));
+  const startA = Math.PI;
+  const endFullA = 0;
+  const endA = startA - Math.PI*visualPct;
+  const x1 = cx + r*Math.cos(startA),  y1 = cy - r*Math.sin(startA);
+  const xEndFull = cx + r*Math.cos(endFullA), yEndFull = cy - r*Math.sin(endFullA);
+  const xEnd = cx + r*Math.cos(endA),  yEnd = cy - r*Math.sin(endA);
+  const track = `<path d="M ${x1} ${y1} A ${r} ${r} 0 0 1 ${xEndFull} ${yEndFull}" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="14" stroke-linecap="round"/>`;
+  // Glow mais forte quando em estouro pra chamar atenção visual
+  const glowAlpha = overLimit ? 'CC' : '80';
+  const fill  = visualPct>0.01
+    ? `<path d="M ${x1} ${y1} A ${r} ${r} 0 0 1 ${xEnd.toFixed(2)} ${yEnd.toFixed(2)}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round" style="filter:drop-shadow(0 0 ${overLimit?9:6}px ${color}${glowAlpha})"/>`
+    : '';
+  // Mini badge "+X% acima do limite" só aparece quando estourou
+  const overBadge = overLimit
+    ? `<text x="70" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">⚠ +${(value-100).toFixed(1)}pp acima do limite</text>`
+    : '';
+  return {
+    svg: `<svg class="kpi-gauge-svg" viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">${overBadge}${track}${fill}</svg>`,
+    color,
+    overLimit,
+  };
+}
+
+function renderHeroCards(rowsFiltered){
+  // ----- agregados -----
+  const sum = (fn)=> rowsFiltered.reduce((s,r)=>s+(fn(r)||0),0);
+  const propostas  = sum(r=>r.proposta);
+  const faturado   = sum(r=>r.receita);
+  const aFaturar   = Math.max(0, propostas - faturado);
+  const totalGasto = sum(r=>r.realizado);
+  const previsto   = sum(r=>r.prevEng);
+  const gastoPrev  = totalGasto + previsto;
+  const limite     = sum(r=>r.orcado);
+  const pctFat     = propostas>0 ? (faturado/propostas*100) : 0;
+  const avanco     = limite>0    ? (totalGasto/limite*100) : 0;
+  const avancoSim  = limite>0    ? (gastoPrev/limite*100)  : 0;
+
+  // ----- delta vs semana anterior (mesmos códigos) -----
+  let prevSet = null;
+  if(state.prev){
+    const codes = new Set(rowsFiltered.map(r=>r.cod));
+    prevSet = state.prev.rows.filter(r=>codes.has(r.cod));
+  }
+  function deltaPill(curr, prev, fmt=fmtBRL){
+    if(prev==null) return '';
+    const d = curr - prev;
+    if(Math.abs(d) < 100) return `<div class="kpi-delta flat">— sem variação</div>`;
+    const arrow = d>0?'▲':'▼';
+    const cls   = d>0?'up':'down';
+    return `<div class="kpi-delta ${cls}">${arrow} ${fmt(Math.abs(d))}</div>`;
+  }
+  function deltaPp(curr, prev){
+    if(prev==null) return '';
+    const d = curr - prev;
+    if(Math.abs(d) < 0.05) return `<div class="kpi-delta flat">— sem variação</div>`;
+    const arrow = d>0?'▲':'▼';
+    const cls   = d>0?'up':'down';
+    return `<div class="kpi-delta ${cls}">${arrow} ${Math.abs(d).toFixed(1)}pp</div>`;
+  }
+  // valores da semana anterior (mesmo subconjunto)
+  let prevPropostas=null, prevFaturado=null, prevAFaturar=null;
+  let prevGasto=null, prevGastoPrev=null, prevLimite=null;
+  let prevPctFat=null, prevAvanco=null, prevAvancoSim=null;
+  if(prevSet){
+    const sP = (fn)=> prevSet.reduce((s,r)=>s+(fn(r)||0),0);
+    prevPropostas = sP(r=>r.proposta);
+    prevFaturado  = sP(r=>r.receita);
+    prevAFaturar  = Math.max(0, prevPropostas - prevFaturado);
+    prevGasto     = sP(r=>r.realizado);
+    const prevPrev= sP(r=>r.prevEng);
+    prevGastoPrev = prevGasto + prevPrev;
+    prevLimite    = sP(r=>r.orcado);
+    prevPctFat    = prevPropostas>0 ? (prevFaturado/prevPropostas*100) : 0;
+    prevAvanco    = prevLimite>0    ? (prevGasto/prevLimite*100) : 0;
+    prevAvancoSim = prevLimite>0    ? (prevGastoPrev/prevLimite*100) : 0;
+  }
+
+  // ----- renderiza cada card -----
+  const setCard = (id, title, value, sub, delta)=>{
+    document.getElementById(id).innerHTML = `
+      <div class="kpi-title">${title}</div>
+      <div class="kpi-value">${value}</div>
+      ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+      ${delta||''}`;
+  };
+  const setGaugeCard = (id, title, value, subText, gauge)=>{
+    document.getElementById(id).innerHTML = `
+      <div class="kpi-title">${title}</div>
+      <div class="kpi-gauge-wrap">
+        ${gauge.svg}
+        <div class="kpi-gauge-num" style="color:${gauge.color}">${value}</div>
+      </div>
+      ${subText?`<div class="kpi-sub">${subText}</div>`:''}`;
+  };
+
+  // FATURAMENTO
+  setCard('kpiPropostas', 'Valor total das propostas', fmtBRL(propostas),
+          `${rowsFiltered.length} obra${rowsFiltered.length!==1?'s':''}`,
+          deltaPill(propostas, prevPropostas));
+  setCard('kpiFaturado',  'Total faturado',            fmtBRL(faturado),
+          `receita realizada`, deltaPill(faturado, prevFaturado));
+  setCard('kpiAFaturar',  'A faturar',                 fmtBRL(aFaturar),
+          `saldo a emitir`,    deltaPill(aFaturar, prevAFaturar));
+  setGaugeCard('kpiPctFat', 'Total Faturado (%)', pctFat.toFixed(2),
+               `faturado ÷ propostas`,
+               renderArcGauge(pctFat, {thresholdsHighGood:true}));
+
+  // CUSTOS & EXECUÇÃO
+  setCard('kpiGasto',     'Total Gasto',                  fmtBRL(totalGasto),
+          `custo realizado`, deltaPill(totalGasto, prevGasto));
+  setCard('kpiGastoPrev', 'Gasto + Previsto a gastar',    fmtBRL(gastoPrev),
+          `custo total estimado`, deltaPill(gastoPrev, prevGastoPrev));
+  setCard('kpiLimite',    'Limite de custo',              fmtBRL(limite),
+          `orçado p/ margem 30%`, deltaPill(limite, prevLimite));
+  setGaugeCard('kpiAvanco', 'Avanço Fin. (%)', avanco.toFixed(2),
+               `gasto ÷ limite`,
+               renderArcGauge(avanco, {thresholdsHighBad:true}));
+  setGaugeCard('kpiAvancoSim', 'Avanço Fin. simulado p/ conclusão (%)', avancoSim.toFixed(2),
+               `(gasto + previsto) ÷ limite`,
+               renderArcGauge(avancoSim, {thresholdsHighBad:true}));
+}
+
+/* ============== DRAWER GERENCIAR OBRAS ============== */
+function openDrawer(){
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerBg').classList.add('open');
+  renderDrawer();
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerBg').classList.remove('open');
+}
+function bindDrawer(){
+  document.getElementById('btnManage').onclick = openDrawer;
+  document.getElementById('drawerClose').onclick = closeDrawer;
+  document.getElementById('drawerBg').onclick = closeDrawer;
+  document.getElementById('drawerSearch').oninput = (e)=>{
+    state.drawerSearch = e.target.value.toLowerCase().trim();
+    renderDrawer();
+  };
+  document.querySelectorAll('.drawer-actions button').forEach(btn=>{
+    btn.onclick = ()=>{
+      pushHistory('ação em lote');
+      const action = btn.dataset.action;
+      // Aplica apenas aos itens visíveis no drawer (respeitando a busca)
+      const visiveisDrawer = filterDrawerItems(state.curr.rows);
+      if(action==='all-on'){
+        visiveisDrawer.forEach(r=>state.overrides.set(r.cod, true));
+      } else if(action==='all-off'){
+        visiveisDrawer.forEach(r=>state.overrides.set(r.cod, false));
+      } else if(action==='apply-sim'){
+        // marca SIM apenas o que tem col J = SIM (e desmarca os outros) — entre os itens visíveis no drawer
+        visiveisDrawer.forEach(r=>{
+          const cls = classifyVisivel(r.visivel);
+          state.overrides.set(r.cod, cls==='sim');
+        });
+      } else if(action==='reset'){
+        clearAllOverrides();
+        renderDrawer(); render(); return;
+      }
+      // Normalizar: remove overrides que coincidem com o default — mantém Map limpo
+      [...state.overrides.entries()].forEach(([cod, val])=>{
+        const r = state.curr.rows.find(x=>x.cod===cod);
+        if(r && defaultVisivel(r)===val) state.overrides.delete(cod);
+      });
+      saveOverrides();
+      updateOverrideBadge();
+      renderDrawer();
+      render();
+    };
+  });
+}
+function filterDrawerItems(rows){
+  const q = state.drawerSearch;
+  if(!q) return rows;
+  return rows.filter(r=>{
+    const hay = (r.cod+' '+(r.cn||'')+' '+(r.tipo||'')).toLowerCase();
+    return hay.includes(q);
+  });
+}
+function renderDrawer(){
+  const body = document.getElementById('drawerBody');
+  const stats = document.getElementById('drawerStats');
+  if(!state.curr){ body.innerHTML = '<p style="color:var(--muted)">Carregue uma planilha primeiro.</p>'; return; }
+  const all = state.curr.rows;
+  const visible = all.filter(passaVisivel);
+  const overrideCount = state.overrides.size;
+  stats.innerHTML = `<b>${visible.length}</b>/${all.length} visíveis${overrideCount?` · <b style="color:var(--orange)">${overrideCount}</b> override${overrideCount>1?'s':''}`:''}`;
+
+  body.innerHTML = '';
+  const items = filterDrawerItems(all);
+  // agrupa por tipo
+  const byTipo = {};
+  items.forEach(r=>{ const t=r.tipo||'OUTROS SERVIÇOS'; (byTipo[t]=byTipo[t]||[]).push(r); });
+  const tiposOrder = TIPOS_ORDEM.filter(t=>byTipo[t]);
+
+  if(items.length===0){
+    body.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">Nenhuma obra encontrada para essa busca.</p>';
+    return;
+  }
+
+  tiposOrder.forEach(t=>{
+    const grupo = byTipo[t].sort((a,b)=>parseFloat(a.cod)-parseFloat(b.cod) || a.cod.localeCompare(b.cod));
+    body.insertAdjacentHTML('beforeend', `<div class="drawer-group-hd">${TIPO_LABEL[t]||t} · ${grupo.length}</div>`);
+    grupo.forEach(r=>{
+      const isVisible    = passaVisivel(r);
+      const isOverride   = state.overrides.has(r.cod);
+      const def          = classifyVisivel(r.visivel, r.statusEng);
+      const defLabel     = def==='sim'?'SIM' : def==='ainda'?'AINDA' : 'NÃO';
+      const tipoClass    = TIPO_SHORT[r.tipo]||'OUTROS';
+      const cn           = r.cn||'';
+      const partes       = cn.split(' - ');
+      const desc         = partes.length>=4 ? partes.slice(2,-2).join(' - ') : cn;
+      const cliente      = partes.length>=4 ? partes[partes.length-2] : '';
+      const filial       = partes.length>=4 ? partes[partes.length-1] : '';
+      // Origem do default: explícito (col VISÍVEL) ou inferido (Status Engenharia)
+      const origemDef = (r.visivel!=null && String(r.visivel).trim()!=='')
+        ? `col VISÍVEL: ${String(r.visivel).trim()}`
+        : (r.statusEng ? `status: ${r.statusEng}` : 'sem dados');
+      body.insertAdjacentHTML('beforeend', `
+        <label class="drawer-item">
+          <input type="checkbox" data-cod="${r.cod}" ${isVisible?'checked':''}>
+          <div class="dit-info">
+            <div><span class="dit-cod">${r.cod}</span> <span class="dit-name">${desc}</span> ${isOverride?'<span class="dit-override-tag">● override</span>':''}</div>
+            <div class="dit-sub">
+              <span class="dit-tipo ${tipoClass}">${TIPO_LABEL[r.tipo]||r.tipo}</span>
+              <span>${cliente} · ${filial}</span>
+              <span class="dit-default ${defLabel}" title="${origemDef}">${defLabel}</span>
+            </div>
+          </div>
+        </label>`);
+    });
+  });
+
+  // wire up checkboxes
+  body.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.onclick = (e)=>{
+      e.stopPropagation();
+      pushHistory('marcar/desmarcar obra');
+      setOverride(cb.dataset.cod, cb.checked);
+      renderDrawer();
+      render();
+    };
+  });
+}
+
+/* ----- toggle visibilidade ----- */
+function bindVisivelToggle(){
+  document.querySelectorAll('#visivelGroup .vis-chip').forEach(el=>{
+    el.onclick = ()=>{
+      pushHistory('mudar visibilidade');
+      state.visivel = el.dataset.vis;
+      document.querySelectorAll('#visivelGroup .vis-chip').forEach(x=>{
+        x.classList.remove('on','todos','incluir');
+        if(x.dataset.vis===state.visivel){
+          x.classList.add('on');
+          if(state.visivel==='todos') x.classList.add('todos');
+          if(state.visivel==='incluir') x.classList.add('incluir');
+        }
+      });
+      // Normaliza: como o default mudou, alguns overrides podem ter virado redundantes
+      [...state.overrides.entries()].forEach(([cod, val])=>{
+        const r = state.curr.rows.find(x=>x.cod===cod);
+        if(r && defaultVisivel(r)===val) state.overrides.delete(cod);
+      });
+      saveOverrides();
+      updateOverrideBadge();
+      render();
+      if(document.getElementById('drawer').classList.contains('open')) renderDrawer();
+    };
+  });
+}
+
+/* --- agrupamento por tipo --- */
+function aggregate(rows){
+  let orcado=0, realizado=0, prevEng=0, saldo=0, proposta=0, imposto=0, count=0;
+  rows.forEach(r=>{
+    orcado += r.orcado; realizado += r.realizado; prevEng += r.prevEng;
+    saldo += r.saldo; proposta += r.proposta; imposto += (r.imposto||0); count++;
+  });
+  // margem ponderada (média da margem atual pelo valor da proposta) — coerente com o que vem da planilha
+  let mw=0, pw=0;
+  rows.forEach(r=>{ if(r.proposta>0){ mw += r.margemAtu*r.proposta; pw += r.proposta; } });
+  return {orcado, realizado, prevEng, saldo, proposta, imposto, count, margem: pw>0 ? mw/pw : 0};
+}
+
+function renderTypeCards(rowsFiltered){
+  const container = document.getElementById('typeCards');
+  container.innerHTML = '';
+  const tipos = state.filtros.includes('TODOS') ? TIPOS_ORDEM : state.filtros;
+  const cards = [];
+  tipos.forEach(t=>{
+    const subCurr = rowsFiltered.filter(r=>r.tipo===t);
+    if(subCurr.length===0) return;
+    // prev = mesmos códigos de CN que estão visíveis no curr (apple-to-apple)
+    let subPrev = null;
+    if(state.prev){
+      const codes = new Set(subCurr.map(r=>r.cod));
+      subPrev = state.prev.rows.filter(r=>codes.has(r.cod));
+    }
+    cards.push({tipo:t, label:TIPO_LABEL[t]||t, curr:aggregate(subCurr), prev:subPrev?aggregate(subPrev):null});
+  });
+  // Total
+  const totalCurr = aggregate(rowsFiltered);
+  let totalPrev = null;
+  if(state.prev){
+    const codes = new Set(rowsFiltered.map(r=>r.cod));
+    totalPrev = aggregate(state.prev.rows.filter(r=>codes.has(r.cod)));
+  }
+  cards.push({tipo:'TOTAL', label:'TOTAL Selecionado', curr:totalCurr, prev:totalPrev});
+
+  cards.forEach(c=>{
+    const dRea = c.prev ? delta(c.curr.realizado, c.prev.realizado) : null;
+    const dOrc = c.prev ? delta(c.curr.orcado, c.prev.orcado) : null;
+    const dMar = c.prev ? delta(c.curr.margem, c.prev.margem, true) : null;
+    const margemClass = c.curr.margem>=0.30 ? 'green' : c.curr.margem>=0.20 ? 'orange' : 'red';
+    const card = document.createElement('div');
+    card.className = 'tc';
+    card.setAttribute('data-tipo', c.tipo);
+    card.innerHTML = `
+      <h3>${c.label} · ${c.curr.count} obra${c.curr.count!==1?'s':''}</h3>
+      <div class="row"><span class="k">Orçado</span><span class="v cyan">${fmtBRL(c.curr.orcado)} ${dOrc?`<span class="delta ${dOrc.cls}">${dOrc.txt}</span>`:''}</span></div>
+      <div class="row"><span class="k">Realizado</span><span class="v">${fmtBRL(c.curr.realizado)} ${dRea?`<span class="delta ${dRea.cls==='up'?'down':dRea.cls==='down'?'up':'flat'}">${dRea.txt}</span>`:''}</span></div>
+      <div class="row"><span class="k">Custo previsto eng.</span><span class="v purple">${fmtBRL(c.curr.prevEng)}</span></div>
+      <div class="row"><span class="k">Saldo do orçado</span><span class="v yellow">${fmtBRL(c.curr.saldo)}</span></div>
+      <div class="margin-big">
+        <span class="val ${margemClass==='green'?'':margemClass==='orange'?'':''}" style="color:var(--${margemClass==='green'?'green':margemClass==='orange'?'orange':'red'})">${fmtPct(c.curr.margem)}</span>
+        ${dMar?`<span class="delta ${dMar.cls}">${dMar.txt}</span>`:''}
+        <span style="font-size:11px;color:var(--muted);margin-left:auto;align-self:center">margem ponderada</span>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+/* --- CHARTS --- */
+let chartPlano=null, chartReal=null;
+
+/* ============== VELOCÍMETROS (SVG) ============== */
+function findZoneColor(value, zones){
+  for(const z of zones){ if(value>=z.from && value<=z.to) return z.color; }
+  return '#8b9aaf';
+}
+function findZoneLabel(value, zones){
+  for(const z of zones){ if(value>=z.from && value<=z.to) return z.label; }
+  return '';
+}
+
+function renderGauge(opts){
+  const {value, min, max, zones, label, sub, format} = opts;
+  const cx=100, cy=95, r=72;
+  const v = isFinite(value) ? value : min;
+  const norm = Math.max(0, Math.min(1, (v - min) / (max - min)));
+  const angleDeg = 180 - 180*norm;           // 180° (esq) → 0° (dir)
+  const angleRad = angleDeg * Math.PI / 180;
+  // zonas (arcos coloridos)
+  let arcs = '';
+  zones.forEach(z=>{
+    const t1 = Math.max(0,Math.min(1,(z.from - min)/(max - min)));
+    const t2 = Math.max(0,Math.min(1,(z.to   - min)/(max - min)));
+    if(t1===t2) return;
+    const a1 = (180 - 180*t1) * Math.PI/180;
+    const a2 = (180 - 180*t2) * Math.PI/180;
+    const x1=cx+r*Math.cos(a1), y1=cy-r*Math.sin(a1);
+    const x2=cx+r*Math.cos(a2), y2=cy-r*Math.sin(a2);
+    arcs += `<path d="M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}" stroke="${z.color}" stroke-width="14" fill="none" stroke-linecap="butt" opacity="0.85"/>`;
+  });
+  // ticks de marcação intermediários (subtle)
+  let ticks = '';
+  for(let i=0;i<=4;i++){
+    const t = i/4;
+    const a = (180 - 180*t) * Math.PI/180;
+    const x1=cx+(r-10)*Math.cos(a), y1=cy-(r-10)*Math.sin(a);
+    const x2=cx+(r+3)*Math.cos(a), y2=cy-(r+3)*Math.sin(a);
+    ticks += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#0a1628" stroke-width="1.5"/>`;
+  }
+  // ponteiro
+  const nx = cx + (r-6)*Math.cos(angleRad);
+  const ny = cy - (r-6)*Math.sin(angleRad);
+  const valColor = findZoneColor(v, zones);
+  const valLabel = findZoneLabel(v, zones);
+  return `
+    <div class="gauge">
+      <div class="gauge-title">${label}</div>
+      <svg class="gauge-svg" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        ${arcs}
+        ${ticks}
+        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#e6edf5" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))"/>
+        <circle cx="${cx}" cy="${cy}" r="6" fill="#0a1628" stroke="#e6edf5" stroke-width="2"/>
+        <text x="${cx-r-2}" y="${cy+16}" font-size="9" fill="#8b9aaf" text-anchor="middle">${format(min)}</text>
+        <text x="${cx+r+2}" y="${cy+16}" font-size="9" fill="#8b9aaf" text-anchor="middle">${format(max)}</text>
+      </svg>
+      <div class="gauge-value" style="color:${valColor}">${format(v)}</div>
+      <div class="gauge-zone" style="color:${valColor}">${valLabel}</div>
+      <div class="gauge-sub">${sub}</div>
+    </div>`;
+}
+
+function renderGauges(rowsFiltered){
+  const grid = document.getElementById('gaugesGrid');
+  if(!grid) return;
+  if(rowsFiltered.length===0){
+    grid.innerHTML = '<div class="gauge-empty">Nenhuma obra no filtro atual</div>';
+    return;
+  }
+  // KPI 1: margem ponderada
+  let mw=0, pw=0;
+  rowsFiltered.forEach(r=>{ if(r.proposta>0){ mw += r.margemAtu*r.proposta; pw += r.proposta; } });
+  const margemPct = pw>0 ? mw/pw*100 : 0;
+  // KPI 2: avanço médio do orçado (ponderado pelo orçado)
+  let aw=0, ow=0;
+  rowsFiltered.forEach(r=>{ if(r.orcado>0){ aw += r.realizado; ow += r.orcado; } });
+  const avancoPct = ow>0 ? aw/ow*100 : 0;
+  // KPI 3: % obras saudáveis (margem >= 30%)
+  const nSaud = rowsFiltered.filter(r=>r.margemAtu>=0.30).length;
+  const pctSaud = rowsFiltered.length>0 ? nSaud/rowsFiltered.length*100 : 0;
+  // KPI 4: % da proposta em obras com margem < 20%
+  const propTot = rowsFiltered.reduce((s,r)=>s+(r.proposta>0?r.proposta:0),0);
+  const propRisco = rowsFiltered.filter(r=>r.margemAtu<0.20).reduce((s,r)=>s+(r.proposta>0?r.proposta:0),0);
+  const riscoPct = propTot>0 ? propRisco/propTot*100 : 0;
+
+  const RED='#ef4444', ORG='#fb923c', YEL='#fde047', GRN='#4ade80';
+  // KPIs auxiliares pra subtítulos contextuais e links de filtro
+  const nPrej = rowsFiltered.filter(r=>r.proposta>0 && r.margemAtu < 0).length;
+  const nEstouro = rowsFiltered.filter(r=>r.orcado>0 && (r.realizado/r.orcado) > 1.0).length;
+  const nForaMeta = rowsFiltered.filter(r=>r.proposta>0 && r.margemAtu < 0.30).length;
+  const nRisco20 = rowsFiltered.filter(r=>r.proposta>0 && r.margemAtu < 0.20).length;
+  const isActive = (crit)=> state.criterio===crit ? ' active' : '';
+  const link = (crit, color, text)=>
+    `<a class="gauge-filter-link${isActive(crit)}" data-criterio="${crit}" style="color:${color}" title="Clique para filtrar o dashboard">${text}</a>`;
+
+  const html =
+    /* 1) MARGEM PROJETADA — higher better. PREJUÍZO separado de margem crítica. Meta ≥30%. */
+    renderGauge({
+      label:'Margem Projetada', value:margemPct, min:-20, max:50,
+      zones:[
+        {from:-20, to: 0,  color:RED, label:'🔴 PREJUÍZO'},
+        {from:  0, to:15,  color:ORG, label:'🟠 CRÍTICA'},
+        {from: 15, to:30,  color:YEL, label:'🟡 ABAIXO DA META'},
+        {from: 30, to:50,  color:GRN, label:'🟢 NA META'},
+      ],
+      format:v=>v.toFixed(1)+'%',
+      sub:`meta 30% · ponderada pela proposta${nPrej>0?` · ${link('prejuizo',RED,`⚡ ${nPrej} obra(s) em prejuízo`)}`:''}`,
+    }) +
+    /* 2) AVANÇO DO ORÇADO — higher worse. Vocabulário neutro, sem 'estouro/folga'. */
+    renderGauge({
+      label:'Avanço do Orçado', value:avancoPct, min:0, max:150,
+      zones:[
+        {from:  0, to: 60, color:GRN, label:'🟢 DENTRO DO ORÇADO'},
+        {from: 60, to: 85, color:YEL, label:'🟡 AVANÇADO'},
+        {from: 85, to:100, color:ORG, label:'🟠 PRÓXIMO DO LIMITE'},
+        {from:100, to:150, color:RED, label:'🔴 ACIMA DO LIMITE'},
+      ],
+      format:v=>v.toFixed(0)+'%',
+      sub:`gasto ÷ limite · 100% = orçado esgotado${nEstouro>0?` · ${link('estouro',RED,`⚡ ${nEstouro} obra(s) acima do limite`)}`:''}`,
+    }) +
+    /* 3) OBRAS SAUDÁVEIS — higher better. 50-70 vira ALERTA. */
+    renderGauge({
+      label:'Obras Saudáveis', value:pctSaud, min:0, max:100,
+      zones:[
+        {from:  0, to: 50, color:RED, label:'🔴 CRÍTICO'},
+        {from: 50, to: 70, color:ORG, label:'🟠 ALERTA'},
+        {from: 70, to: 85, color:YEL, label:'🟡 BOM'},
+        {from: 85, to:100, color:GRN, label:'🟢 EXCELENTE'},
+      ],
+      format:v=>v.toFixed(0)+'%',
+      sub:`${link('saudaveis',GRN,`⚡ ${nSaud} saudáveis`)} · ${link('foraDaMeta',ORG,`⚡ ${nForaMeta} fora da meta`)}`,
+    }) +
+    /* 4) RISCO DO PORTFÓLIO — higher worse. Mais rigoroso por ser métrica financeira. */
+    renderGauge({
+      label:'Risco do Portfólio', value:riscoPct, min:0, max:100,
+      zones:[
+        {from:  0, to: 10, color:GRN, label:'🟢 BAIXO'},
+        {from: 10, to: 25, color:YEL, label:'🟡 MODERADO'},
+        {from: 25, to: 40, color:ORG, label:'🟠 ALERTA'},
+        {from: 40, to:100, color:RED, label:'🔴 CRÍTICO'},
+      ],
+      format:v=>v.toFixed(0)+'%',
+      sub:nRisco20>0
+        ? `${link('riscoBaixa',RED,`⚡ ${nRisco20} obra(s)`)} com margem < 20% · R$ ${(propRisco/1e6).toFixed(2)}M`
+        : `Nenhuma obra com margem < 20% · saudável`,
+    });
+  grid.innerHTML = html;
+
+  // Wire up dos links de filtro (gauge → setCriterio)
+  grid.querySelectorAll('.gauge-filter-link').forEach(el=>{
+    el.onclick = (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      setCriterio(el.dataset.criterio);
+    };
+  });
+}
+
+const COR_IMPOSTO  = '#fde047'; // amarelo
+const COR_ORCADO   = '#00d4ff'; // ciano (custo planejado)
+const COR_REALIZ   = '#fb923c'; // laranja (custo gasto)
+const COR_PREVENG  = '#b794f4'; // roxo (custo a gastar)
+const COR_MARGEM   = '#4ade80'; // verde (lucro+adm)
+const COR_ESTOURO  = '#ef4444'; // vermelho (margem negativa)
+
+function renderCharts(rowsFiltered){
+  /* ===== 1) COMPOSIÇÃO — PLANO vs REALIDADE ===== */
+  const ag = aggregate(rowsFiltered);
+  const proposta = ag.proposta;
+  const imposto  = ag.imposto;
+  const orcado   = ag.orcado;                       // limite p/ margem 30%
+  const realiz   = ag.realizado;
+  const prev     = ag.prevEng;
+  const margemPlanej = Math.max(0, proposta - imposto - orcado);  // = ~30% da proposta
+  const custoTotal   = realiz + prev;
+  const margemAtual  = proposta - imposto - custoTotal;
+  const margemPct    = proposta>0 ? margemAtual/proposta : 0;
+  const margemPlanPct= proposta>0 ? margemPlanej/proposta : 0;
+  const isEstouro    = margemAtual < 0;
+
+  /* PLANO */
+  const planoSlices = [
+    {label:'Impostos',                 val:imposto,      cor:COR_IMPOSTO},
+    {label:'Custo Orçado (p/ 30%)',    val:orcado,       cor:COR_ORCADO},
+    {label:'Margem Planejada (30%)',   val:margemPlanej, cor:COR_MARGEM},
+  ];
+  /* REALIDADE — se margem negativa, mostra fatia ESTOURO em vermelho */
+  const realSlices = isEstouro ? [
+    {label:'Impostos',           val:imposto,             cor:COR_IMPOSTO},
+    {label:'Custo Realizado',    val:realiz,              cor:COR_REALIZ},
+    {label:'Custo Previsto Eng.',val:prev,                cor:COR_PREVENG},
+    {label:'ESTOURO (margem -)', val:Math.abs(margemAtual), cor:COR_ESTOURO},
+  ] : [
+    {label:'Impostos',           val:imposto,    cor:COR_IMPOSTO},
+    {label:'Custo Realizado',    val:realiz,     cor:COR_REALIZ},
+    {label:'Custo Previsto Eng.',val:prev,       cor:COR_PREVENG},
+    {label:'Margem Projetada',   val:margemAtual,cor:COR_MARGEM},
+  ];
+
+  // base do tooltip = total da proposta (para o caso normal) ou soma das fatias (para estouro)
+  const totalRef = isEstouro ? realSlices.reduce((s,x)=>s+x.val,0) : proposta;
+
+  const buildDonut = (canvasId, slices, totalRefSlice) =>{
+    return new Chart(document.getElementById(canvasId),{
+      type:'doughnut',
+      data:{
+        labels: slices.map(s=>s.label),
+        datasets:[{
+          data: slices.map(s=>s.val),
+          backgroundColor: slices.map(s=>s.cor),
+          borderColor:'#0a1628', borderWidth:3, hoverOffset:6
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        cutout:'68%',
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            callbacks:{
+              label:c=>{
+                const v = c.parsed;
+                const pct = totalRefSlice>0 ? (v/totalRefSlice*100).toFixed(1) : '0';
+                return ` ${c.label}: ${fmtBRL(v)} (${pct}% da proposta)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  };
+
+  if(chartPlano) chartPlano.destroy();
+  chartPlano = buildDonut('chartPlano', planoSlices, proposta);
+  if(chartReal)  chartReal.destroy();
+  chartReal  = buildDonut('chartReal',  realSlices,  proposta);
+
+  /* labels centrais */
+  const planoCenterVal = document.getElementById('centerPlanoVal');
+  planoCenterVal.textContent = fmtPct(margemPlanPct);
+  planoCenterVal.className = 'comp-center-val'; // verde sempre (é o plano)
+  const realCenterVal = document.getElementById('centerRealVal');
+  realCenterVal.textContent = fmtPct(margemPct);
+  realCenterVal.className = 'comp-center-val' + (margemPct>=0.30 ? '' : margemPct>=0.20 ? ' warn' : ' bad');
+  const deltaEl = document.getElementById('centerRealDelta');
+  const d = margemPct - margemPlanPct;
+  if(Math.abs(d) < 0.0005){
+    deltaEl.textContent = '— igual ao plano';
+    deltaEl.className = 'comp-center-delta flat';
+  } else if(d>0){
+    deltaEl.textContent = `▲ ${(d*100).toFixed(1)}pp acima do plano`;
+    deltaEl.className = 'comp-center-delta up';
+  } else {
+    deltaEl.textContent = `▼ ${(Math.abs(d)*100).toFixed(1)}pp abaixo do plano`;
+    deltaEl.className = 'comp-center-delta down';
+  }
+
+  /* legendas detalhadas (com R$ e %) */
+  const renderLegend = (containerId, slices, totalRef) =>{
+    const c = document.getElementById(containerId);
+    c.innerHTML = '';
+    slices.forEach(s=>{
+      const pct = totalRef>0 ? (s.val/totalRef*100).toFixed(1) : '0';
+      c.insertAdjacentHTML('beforeend',`
+        <div class="lg-row">
+          <span class="lg-left"><span class="lg-sw" style="background:${s.cor}"></span>${s.label}</span>
+          <span><span class="lg-val">${fmtBRL(s.val)}</span><span class="lg-pct">${pct}%</span></span>
+        </div>`);
+    });
+    // linha de TOTAL
+    const total = slices.reduce((sum,x)=>sum+x.val,0);
+    c.insertAdjacentHTML('beforeend',`
+      <div class="lg-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px">
+        <span class="lg-left" style="font-weight:700">Total da Proposta</span>
+        <span><span class="lg-val" style="color:var(--cyan)">${fmtBRL(proposta)}</span></span>
+      </div>`);
+  };
+  renderLegend('legendPlano', planoSlices, proposta);
+  renderLegend('legendReal',  realSlices,  proposta);
+
+  /* ===== 2) PAINEL DE VELOCÍMETROS — KPIs de saúde ===== */
+  renderGauges(rowsFiltered);
+}
+
+/* --- TABELA --- */
+function codeSortKey(cod){
+  // 29.1, 73, A2... ordenação natural: numéricos primeiro (por valor), letras depois
+  const n = parseFloat(cod);
+  if(!isNaN(n) && /^-?[\d.]+$/.test(String(cod))) return [0, n, ''];
+  return [1, 0, String(cod)];
+}
+function compareCN(a, b){
+  const ka = codeSortKey(a.cod), kb = codeSortKey(b.cod);
+  if(ka[0]!==kb[0]) return ka[0]-kb[0];
+  if(ka[0]===0) return ka[1]-kb[1];
+  return ka[2].localeCompare(kb[2]);
+}
+function getSortValue(r, col){
+  if(col==='cod') return null; // tratado em compareCN
+  if(col==='pct') return r.orcado>0 ? r.realizado/r.orcado : 0;
+  if(col==='pctFat') return r.proposta>0 ? (r.receita||0)/r.proposta : 0;
+  if(col==='resp') return (r.resp||'').toLowerCase();
+  return r[col]||0;
+}
+function sortRows(rows){
+  if(!state.sort.col){
+    // padrão: por tipo (ordem canônica) e depois por código natural
+    return [...rows].sort((a,b)=>{
+      const ia = TIPOS_ORDEM.indexOf(a.tipo); const ib = TIPOS_ORDEM.indexOf(b.tipo);
+      if(ia!==ib) return ia-ib;
+      return compareCN(a, b);
+    });
+  }
+  const {col, dir} = state.sort;
+  const mult = dir==='asc' ? 1 : -1;
+  return [...rows].sort((a,b)=>{
+    if(col==='cod') return compareCN(a, b) * mult;
+    const va = getSortValue(a, col);
+    const vb = getSortValue(b, col);
+    if(va < vb) return -1 * mult;
+    if(va > vb) return  1 * mult;
+    // desempate por código natural ascendente
+    return compareCN(a, b);
+  });
+}
+function updateSortIndicators(){
+  document.querySelectorAll('#tabela thead th[data-sort]').forEach(th=>{
+    const col = th.dataset.sort;
+    th.classList.remove('sort-active','sort-asc','sort-desc');
+    if(state.sort.col === col){
+      th.classList.add('sort-active');
+      th.classList.add(state.sort.dir==='asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+function bindTableSort(){
+  document.querySelectorAll('#tabela thead th[data-sort]').forEach(th=>{
+    th.onclick = ()=>{
+      pushHistory('ordenar tabela');
+      const col = th.dataset.sort;
+      const defDir = th.dataset.defaultDir || 'desc';   // numéricos default desc; cod default asc
+      if(state.sort.col === col){
+        // toggle: dir atual → invertido → padrão
+        if(state.sort.dir === defDir){
+          state.sort.dir = (defDir==='desc' ? 'asc' : 'desc');
+        } else {
+          state.sort = {col:null, dir:'desc'};
+        }
+      } else {
+        state.sort = {col, dir: defDir};
+      }
+      render();
+    };
+  });
+}
+
+function renderTable(rows){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  const sorted = sortRows(rows);
+  updateSortIndicators();
+
+  let totOrc=0, totRea=0, totPrev=0, totSaldo=0, totProp=0, totMW=0, totPW=0, totReceita=0;
+  let totOrcPrev=0, totReaPrev=0, totPrevPrev=0, totSaldoPrev=0, totMWPrev=0, totPWPrev=0, totPropPrev=0, totReceitaPrev=0;
+
+  sorted.forEach(r=>{
+    const p = findPrev(r.cod);
+    totOrc += r.orcado; totRea += r.realizado; totPrev += r.prevEng;
+    totSaldo += r.saldo; totProp += r.proposta; totReceita += (r.receita||0);
+    if(r.proposta>0){ totMW += r.margemAtu*r.proposta; totPW += r.proposta; }
+    if(p){
+      totOrcPrev += p.orcado; totReaPrev += p.realizado; totPrevPrev += p.prevEng;
+      totSaldoPrev += p.saldo; totPropPrev += p.proposta; totReceitaPrev += (p.receita||0);
+      if(p.proposta>0){ totMWPrev += p.margemAtu*p.proposta; totPWPrev += p.proposta; }
+    }
+
+    const margemClass = r.margemAtu>=0.30 ? 'good' : r.margemAtu>=0.20 ? 'warn' : 'bad';
+    // Δ margem = SEMPRE comparação com a semana anterior (mesmo CN), NUNCA com a meta de 30%
+    let desvioStr = '';
+    if(p){
+      const dMar = r.margemAtu - p.margemAtu;
+      if(Math.abs(dMar) < 0.0005){
+        desvioStr = ` <span class="margin-delta flat">— s/ var.</span>`;
+      } else {
+        const sign = dMar>0?'▲':'▼';
+        const cls = dMar>0?'up':'down';
+        desvioStr = ` <span class="margin-delta ${cls}">${sign}${Math.abs(dMar*100).toFixed(1)}pp</span>`;
+      }
+    }
+    // tooltip mostra a distância vs meta de 30% (info contextual, sem setinha)
+    const distMeta = ((r.margemAtu - 0.30)*100).toFixed(1);
+    const tipMeta = `Margem projetada: ${(r.margemAtu*100).toFixed(1)}% · meta 30% · ${distMeta>=0?'+':''}${distMeta}pp vs meta`;
+    const pctExec = r.orcado>0 ? r.realizado/r.orcado : 0;
+
+    const tipoTag = TIPO_SHORT[r.tipo] || 'OUTROS';
+    const cnFormatted = formatCN(r.cn, r.cod);
+
+    const respText = (r.resp||'').trim();
+    // Coluna Proposta + % Faturado
+    const pctFatVal = r.proposta>0 ? (r.receita||0)/r.proposta : 0;
+    const pctFatPrev = p && p.proposta>0 ? (p.receita||0)/p.proposta : null;
+    // cor semafórica do % Faturado: vermelho<25, laranja<50, amarelo<75, verde>=75
+    const pctFatCls = pctFatVal>=0.75 ? 'good' : pctFatVal>=0.50 ? 'warn' : 'bad';
+    tb.insertAdjacentHTML('beforeend',`
+      <tr data-cod="${r.cod}">
+        <td data-col="cod"><div class="cn-cell ${tipoTag}" title="${(r.cn||'').replace(/"/g,'&quot;')}"><button class="hide-btn" data-hide="${r.cod}" title="Esconder esta obra do relatório">×</button><span class="cn-full">${cnFormatted}</span></div></td>
+        <td data-col="resp"><div class="resp-cell ${respText?'':'empty'}">${respText||'—'}</div></td>
+        <td data-col="proposta">
+          ${p?`<span class="val-prev">${fmtBRL(p.proposta)}</span>`:''}
+          <span class="val-big">${fmtBRL(r.proposta)}</span>
+          ${p?deltaArrow(r.proposta,p.proposta,false,false):''}
+        </td>
+        <td data-col="pctFat">
+          ${pctFatPrev!=null?`<span class="val-prev">${fmtPct(pctFatPrev)}</span>`:''}
+          <span class="pct-fat-cell ${pctFatCls}">${fmtPct(pctFatVal)}</span>
+          ${pctFatPrev!=null?deltaArrow(pctFatVal,pctFatPrev,true,false):''}
+        </td>
+        <td data-col="orcado">
+          ${p?`<span class="val-prev">${fmtBRL(p.orcado)}</span>`:''}
+          <span class="val-big">${fmtBRL(r.orcado)}</span>
+          ${p?deltaArrow(r.orcado,p.orcado,false,false):''}
+        </td>
+        <td data-col="realizado">
+          ${p?`<span class="val-prev">${fmtBRL(p.realizado)}</span>`:''}
+          <span class="val-big">${fmtBRL(r.realizado)}</span>
+          ${p?deltaArrow(r.realizado,p.realizado,false,true):''}
+        </td>
+        <td data-col="prevEng">
+          ${p?`<span class="val-prev">${fmtBRL(p.prevEng)}</span>`:''}
+          <span class="val-big purple">${fmtBRL(r.prevEng)}</span>
+          ${p?deltaArrow(r.prevEng,p.prevEng,false,true):''}
+        </td>
+        <td data-col="saldo">
+          ${p?`<span class="val-prev">${fmtBRL(p.saldo)}</span>`:''}
+          <span class="val-big yellow">${fmtBRL(r.saldo)}</span>
+          ${p?deltaArrow(r.saldo,p.saldo,false,false):''}
+        </td>
+        <td data-col="pct"><span class="pct">${fmtPct(pctExec)}</span></td>
+        <td data-col="margemAtu" title="${tipMeta}"><span class="margin-cell ${margemClass}">${fmtPct(r.margemAtu)}</span>${desvioStr}</td>
+      </tr>
+    `);
+  });
+
+  // linha de total
+  const margemTot = totPW>0 ? totMW/totPW : 0;
+  const margemTotPrev = totPWPrev>0 ? totMWPrev/totPWPrev : null;
+  const margemClassTot = margemTot>=0.30 ? 'good' : margemTot>=0.20 ? 'warn' : 'bad';
+  const pctTot = totOrc>0 ? totRea/totOrc : 0;
+  const dMarTot = margemTotPrev!=null ? deltaArrow(margemTot,margemTotPrev,true,false) : '';
+  const totPctFat = totProp>0 ? totReceita/totProp : 0;
+  const totPctFatPrev = totPropPrev>0 ? totReceitaPrev/totPropPrev : null;
+  const totPctFatCls = totPctFat>=0.75 ? 'good' : totPctFat>=0.50 ? 'warn' : 'bad';
+  tb.insertAdjacentHTML('beforeend',`
+    <tr class="total">
+      <td data-col="cod"><b style="font-size:15px;color:var(--cyan)">TOTAL ${state.filtros.includes('TODOS')?'GERAL':'SELECIONADO'}</b></td>
+      <td data-col="resp"></td>
+      <td data-col="proposta">
+        ${state.prev?`<span class="val-prev">${fmtBRL(totPropPrev)}</span>`:''}
+        <span class="val-big">${fmtBRL(totProp)}</span>
+        ${state.prev?deltaArrow(totProp,totPropPrev,false,false):''}
+      </td>
+      <td data-col="pctFat">
+        ${totPctFatPrev!=null?`<span class="val-prev">${fmtPct(totPctFatPrev)}</span>`:''}
+        <span class="pct-fat-cell ${totPctFatCls}">${fmtPct(totPctFat)}</span>
+        ${totPctFatPrev!=null?deltaArrow(totPctFat,totPctFatPrev,true,false):''}
+      </td>
+      <td data-col="orcado">
+        ${state.prev?`<span class="val-prev">${fmtBRL(totOrcPrev)}</span>`:''}
+        <span class="val-big">${fmtBRL(totOrc)}</span>
+        ${state.prev?deltaArrow(totOrc,totOrcPrev,false,false):''}
+      </td>
+      <td data-col="realizado">
+        ${state.prev?`<span class="val-prev">${fmtBRL(totReaPrev)}</span>`:''}
+        <span class="val-big">${fmtBRL(totRea)}</span>
+        ${state.prev?deltaArrow(totRea,totReaPrev,false,true):''}
+      </td>
+      <td data-col="prevEng">
+        ${state.prev?`<span class="val-prev">${fmtBRL(totPrevPrev)}</span>`:''}
+        <span class="val-big purple">${fmtBRL(totPrev)}</span>
+        ${state.prev?deltaArrow(totPrev,totPrevPrev,false,true):''}
+      </td>
+      <td data-col="saldo">
+        ${state.prev?`<span class="val-prev">${fmtBRL(totSaldoPrev)}</span>`:''}
+        <span class="val-big yellow">${fmtBRL(totSaldo)}</span>
+        ${state.prev?deltaArrow(totSaldo,totSaldoPrev,false,false):''}
+      </td>
+      <td data-col="pct"><span class="pct">${fmtPct(pctTot)}</span></td>
+      <td data-col="margemAtu"><span class="margin-cell ${margemClassTot}">${fmtPct(margemTot)}</span> ${dMarTot}</td>
+    </tr>
+  `);
+
+  // wire dos botões × inline
+  tb.querySelectorAll('.hide-btn').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      pushHistory('esconder obra');
+      const cod = btn.dataset.hide;
+      setOverride(cod, false);
+      render();
+    };
+  });
+}
+
+/* ============== AUTO-LOAD DAS BASES (GitHub Pages / servidor http) ==============
+   Quando servido por http(s) — ex.: GitHub Pages — busca as planilhas em
+   dados/semana-atual.xlsx.enc e dados/semana-anterior.xlsx.enc (criptografadas
+   pela página CRIPTOGRAFAR_DADOS.html) ou .xlsx puro como fallback.
+   Detecção pelo cabeçalho "AZTC" do arquivo. Senha pedida 1x (fica na sessão).
+   Formato .enc: "AZTC" + versão(1) + nomeLen(2 BE) + nome utf8 + salt(16) + iv(12)
+   + AES-256-GCM(PBKDF2 SHA-256 250k iterações). Aberto via file://, nada muda. */
+async function decryptAztc(buf, senha){
+  const u = new Uint8Array(buf);
+  const nameLen = (u[5]<<8) | u[6];
+  const nome = new TextDecoder().decode(u.slice(7, 7+nameLen));
+  const salt = u.slice(7+nameLen, 23+nameLen);
+  const iv   = u.slice(23+nameLen, 35+nameLen);
+  const data = u.slice(35+nameLen);
+  const km  = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:250000, hash:'SHA-256'}, km,
+                                            {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data); // senha errada → exceção
+  return {nome, buf: plain};
+}
+const isAztc = buf => { const u=new Uint8Array(buf); return u.length>40 && u[0]===65 && u[1]===90 && u[2]===84 && u[3]===67; };
+
+function pedirSenha(msg){
+  return new Promise(res=>{
+    let ov = document.getElementById('senhaOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id = 'senhaOverlay';
+      ov.innerHTML = `<div class="senha-box">
+        <div class="senha-logo">A</div>
+        <div class="senha-title">Aztech · Painel de Margens</div>
+        <div class="senha-sub">Os dados deste painel são protegidos.</div>
+        <div class="senha-msg"></div>
+        <input type="password" placeholder="Senha de acesso" autocomplete="current-password">
+        <button>Abrir painel</button>
+      </div>`;
+      document.body.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+    ov.querySelector('.senha-msg').textContent = msg || '';
+    const inp = ov.querySelector('input'), btn = ov.querySelector('button');
+    inp.value = '';
+    setTimeout(()=>inp.focus(), 60);
+    const go = ()=>{ ov.style.display='none'; res(inp.value); };
+    btn.onclick = go;
+    inp.onkeydown = e=>{ if(e.key==='Enter') go(); };
+  });
+}
+
+async function autoLoadRemoto(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  let fontes = {atual:'dados/semana-atual.xlsx', anterior:'dados/semana-anterior.xlsx'};
+  try{
+    const m = await fetch('dados/manifest.json',{cache:'no-store'});
+    if(m.ok){
+      const j = await m.json();
+      if(j.atual)    fontes.atual    = j.atual;
+      if(j.anterior) fontes.anterior = j.anterior;
+    }
+  }catch(e){/* manifest é opcional */}
+
+  async function baixa(url){
+    for(const u of [url+'.enc', url]){
+      try{
+        const resp = await fetch(u,{cache:'no-store'});
+        if(resp.ok) return {buf: await resp.arrayBuffer(), nome: decodeURIComponent(u.split('/').pop())};
+      }catch(e){}
+    }
+    return null;
+  }
+  const dAtual = await baixa(fontes.atual);
+  if(!dAtual) return;                                  // sem base publicada → upload manual
+  const dAnt   = await baixa(fontes.anterior);         // opcional
+
+  // descriptografa se necessário (senha única para os dois arquivos)
+  const cifrados = [dAtual, dAnt].filter(d=>d && isAztc(d.buf));
+  if(cifrados.length){
+    let senha = sessionStorage.getItem('aztech-senha') || '';
+    for(let tent=0; tent<20; tent++){
+      if(!senha) senha = await pedirSenha(tent>0 ? '❌ Senha incorreta — tente novamente.' : '');
+      try{
+        for(const d of cifrados){
+          const {nome, buf} = await decryptAztc(d.buf, senha);
+          d.buf = buf; d.nome = nome || d.nome.replace(/\.enc$/,'');
+        }
+        sessionStorage.setItem('aztech-senha', senha);
+        break;
+      }catch(e){ senha=''; if(tent===19) return; }
+    }
+  }
+
+  function aplica(d, target){
+    if(!d) return false;
+    try{
+      state[target] = parseWorkbook(d.buf, d.nome);
+      const inp = document.querySelector(`.upload input[data-target="${target}"]`);
+      const lbl = inp && inp.closest('.upload');
+      if(lbl){
+        lbl.classList.add('ok');
+        const f = lbl.querySelector('.fname');
+        f.classList.remove('empty');
+        f.textContent = '☁ '+d.nome+' ('+state[target].rows.length+' CN)';
+      }
+      return true;
+    }catch(e){ console.warn('auto-load: falha ao interpretar', d.nome, e); return false; }
+  }
+  aplica(dAnt, 'prev');
+  if(aplica(dAtual, 'curr')) tryRender();
+}
+autoLoadRemoto();
+</script>
+<!-- v: 02/07/2026 · Curva ABC + drill-down + Fluxo de Caixa + auto-load p/ GitHub Pages -->
+</body>
+</html>
