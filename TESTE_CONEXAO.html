@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aztech · Diagnóstico do Painel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{--bg:#0a1628;--bg-2:#0f1f38;--card:#142943;--border:#1e3a5f;--border-hi:#2d5187;--text:#e6edf5;--muted:#8b9aaf;--cyan:#00d4ff;--green:#4ade80;--red:#ef4444;--yellow:#fde047}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:30px 16px}
+  .box{max-width:760px;margin:0 auto;background:var(--card);border:1px solid var(--border-hi);border-radius:14px;padding:26px 30px}
+  h1{font-size:17px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+  .linha{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:flex-start}
+  .st{flex:none;width:22px;text-align:center}
+  .ok{color:var(--green)} .erro{color:var(--red)} .aviso{color:var(--yellow)} .rodando{color:var(--cyan)}
+  .det{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
+  input[type=password]{background:var(--bg-2);color:var(--text);border:1px solid var(--border-hi);border-radius:8px;padding:9px 13px;font-size:14px;width:240px}
+  button{background:linear-gradient(135deg,#00d4ff,#0086b3);color:#04101e;font-weight:700;border:none;border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;margin-left:8px}
+  .senha-row{margin:14px 0}
+  #veredito{margin-top:16px;padding:12px 16px;border-radius:9px;font-size:13px;line-height:1.6;display:none}
+  #veredito.ok{background:rgba(74,222,128,.1);border:1px solid var(--green);display:block}
+  #veredito.erro{background:rgba(239,68,68,.1);border:1px solid var(--red);display:block}
+  textarea{width:100%;height:110px;background:var(--bg-2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:10.5px;margin-top:14px;font-family:monospace}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>🩺 Diagnóstico do Painel Aztech</h1>
+  <div class="sub">Testa cada etapa do carregamento e mostra onde falha. Suba este arquivo na RAIZ do repositório e abra <b>…github.io/RESULTADO_GRUPO_AZ/TESTE_CONEXAO.html</b></div>
+  <div class="senha-row">Senha do painel: <input type="password" id="senha"> <button id="btn">▶ Rodar diagnóstico</button></div>
+  <div id="passos"></div>
+  <div id="veredito"></div>
+  <textarea id="log" readonly placeholder="log técnico (copie e mande para o Claude se precisar)"></textarea>
+</div>
+<script>
+const passos = document.getElementById('passos');
+const logEl = document.getElementById('log');
+const LOG = [];
+function log(s){ LOG.push(s); logEl.value = LOG.join('\n'); }
+function passo(nome){
+  const div = document.createElement('div');
+  div.className = 'linha';
+  div.innerHTML = `<span class="st rodando">⏳</span><span>${nome}<span class="det"></span></span>`;
+  passos.appendChild(div);
+  return {
+    ok(det){ div.querySelector('.st').textContent='✅'; div.querySelector('.st').className='st ok'; if(det){div.querySelector('.det').textContent=det;} log('OK  '+nome+' | '+(det||'')); },
+    erro(det){ div.querySelector('.st').textContent='❌'; div.querySelector('.st').className='st erro'; if(det){div.querySelector('.det').textContent=det;} log('ERRO '+nome+' | '+(det||'')); },
+    aviso(det){ div.querySelector('.st').textContent='⚠️'; div.querySelector('.st').className='st aviso'; if(det){div.querySelector('.det').textContent=det;} log('AVISO '+nome+' | '+(det||'')); },
+  };
+}
+async function decryptAztc(buf, senha){
+  const u = new Uint8Array(buf);
+  const nameLen = (u[5]<<8) | u[6];
+  const nome = new TextDecoder().decode(u.slice(7, 7+nameLen));
+  const salt = u.slice(7+nameLen, 23+nameLen);
+  const iv   = u.slice(23+nameLen, 35+nameLen);
+  const data = u.slice(35+nameLen);
+  const km  = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:250000, hash:'SHA-256'}, km, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  return {nome, buf: await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data)};
+}
+const isAztc = buf => { const u=new Uint8Array(buf); return u.length>40 && u[0]===65&&u[1]===90&&u[2]===84&&u[3]===67; };
+
+document.getElementById('btn').onclick = async ()=>{
+  passos.innerHTML=''; LOG.length=0;
+  document.getElementById('veredito').className='';
+  const senha = document.getElementById('senha').value;
+  log('URL: '+location.href);
+  log('Navegador: '+navigator.userAgent);
+
+  // 0. ambiente
+  let p = passo('Ambiente do navegador (SheetJS + WebCrypto)');
+  if(typeof XLSX==='undefined'){ p.erro('SheetJS não carregou do CDN (cdnjs bloqueado? rede corporativa?)'); return; }
+  if(!crypto || !crypto.subtle){ p.erro('WebCrypto indisponível — precisa https'); return; }
+  p.ok('SheetJS '+XLSX.version+' · crypto ok · https='+(location.protocol==='https:'));
+
+  const resultados = {};
+  for(const [rot, url, obrig] of [['Semana ATUAL','dados/semana-atual.xlsx.enc',true],
+                                   ['Semana ANTERIOR','dados/semana-anterior.xlsx.enc',false],
+                                   ['Planejamentos','dados/planejamentos.enc',false]]){
+    // 1. fetch
+    p = passo(`Baixar ${rot} (${url})`);
+    let buf;
+    try{
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok){ p[obrig?'erro':'aviso'](`HTTP ${r.status} — arquivo não está no repositório nesse caminho`); continue; }
+      buf = await r.arrayBuffer();
+      p.ok(`${(buf.byteLength/1024).toFixed(0)} KB`);
+    }catch(e){ p.erro('fetch falhou: '+e.message); continue; }
+    // 2. formato
+    p = passo(`${rot}: formato criptografado (AZTC)`);
+    if(!isAztc(buf)){ p.aviso('NÃO está no formato .enc — foi subido o arquivo puro? (o painel também aceita puro, seguindo)'); resultados[rot]={buf, nome:url}; continue; }
+    p.ok();
+    // 3. decrypt
+    p = passo(`${rot}: abrir com a senha digitada`);
+    try{
+      const t0 = performance.now();
+      const {nome, buf:plain} = await decryptAztc(buf, senha);
+      p.ok(`abriu em ${((performance.now()-t0)/1000).toFixed(1)}s · arquivo interno: ${nome}`);
+      resultados[rot] = {buf: plain, nome};
+    }catch(e){ p.erro('SENHA NÃO ABRE este arquivo (foi criptografado com outra senha) '); continue; }
+  }
+
+  // 4. parse das bases
+  for(const rot of ['Semana ATUAL','Semana ANTERIOR']){
+    if(!resultados[rot]) continue;
+    p = passo(`${rot}: ler como planilha Excel`);
+    try{
+      const wb = XLSX.read(resultados[rot].buf, {type:'array', cellDates:true, cellFormula:true});
+      const temLegacy = wb.SheetNames.includes('ACOMPANHAMENTO CUSTOS');
+      const temUnif   = wb.SheetNames.includes('CENTROS DE NEGÓCIO');
+      if(!temLegacy && !temUnif){ p.erro('abriu, mas NÃO tem as abas ACOMPANHAMENTO CUSTOS nem CENTROS DE NEGÓCIO. Abas: '+wb.SheetNames.slice(0,6).join(', ')); continue; }
+      const ws = wb.Sheets[temLegacy?'ACOMPANHAMENTO CUSTOS':'CENTROS DE NEGÓCIO'];
+      const json = XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      let n=0; for(let i=(temLegacy?3:1);i<json.length;i++){ if(json[i]&&json[i][0]!=null&&json[i][0]!=='') n++; }
+      p.ok(`formato ${temLegacy?'legacy':'unified'} · ${n} CNs · ${wb.SheetNames.length} abas`);
+    }catch(e){ p.erro('SheetJS não conseguiu ler: '+e.message); }
+  }
+  // 5. planejamentos
+  if(resultados['Planejamentos']){
+    p = passo('Planejamentos: abrir o pacote');
+    try{
+      const json = JSON.parse(new TextDecoder().decode(resultados['Planejamentos'].buf));
+      const n = (json.arquivos||[]).length;
+      let okParse = 0;
+      for(const a of (json.arquivos||[])){
+        try{
+          const bin = atob(a.b64); const u = new Uint8Array(bin.length);
+          for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+          const wb = XLSX.read(u.buffer, {type:'array'});
+          if(wb.SheetNames.length) okParse++;
+        }catch(e){}
+      }
+      p.ok(`${n} obra(s) no pacote · ${okParse} legíveis`);
+    }catch(e){ p.erro('pacote inválido: '+e.message); }
+  }
+
+  // veredito
+  const v = document.getElementById('veredito');
+  const erros = LOG.filter(l=>l.startsWith('ERRO'));
+  if(!erros.length){
+    v.className='ok';
+    v.innerHTML = '✅ <b>Tudo passou.</b> Se o painel principal ainda não carrega, o index.html publicado está desatualizado: substitua-o pela versão mais recente do DASHBOARD_MARGENS.html e recarregue com Ctrl+F5.';
+  } else {
+    v.className='erro';
+    v.innerHTML = '❌ <b>Falhou em:</b><br>'+erros.map(e=>'• '+e.replace('ERRO ','')).join('<br>')+'<br><br>Copie o log abaixo e mande para o Claude.';
+  }
+};
+</script>
+</body>
+</html>
